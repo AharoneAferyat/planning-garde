@@ -1,69 +1,68 @@
-# Gardes des Internes — App web
+# Gardes des Internes — Plateforme multi-utilisateurs
 
-Application de planification des gardes d'internes (semestres Nov→Avril / Mai→Oct),
-avec grille 3 blocs de 2 mois, repos automatique, détection V+D et doublons,
-statistiques par interne. React + Firebase, déployé sur Netlify.
+Application de planification des gardes d'internes, multi-utilisateurs avec
+espaces personnels, partage de plannings, rôles et traçabilité.
+React + Firebase, déployée sur Netlify.
 
-## Stack
-- **React 18 + Vite 5** — déployé sur Netlify
-- **Firebase Firestore** — sync temps réel multi-appareils
-- **Firebase Auth (Google)** — lecture libre, édition réservée aux admins
+## Nouveautés de cette version
+- **Authentification obligatoire** en accueil (rien de visible sans connexion Google).
+- **Espaces personnels** : chacun a ses plannings, les retrouve à chaque connexion.
+- **Plannings nommés** (« Rotation Cardiologie 2026 »…), chacun avec **ses propres internes**.
+- **Partage & invitations** : QR code + code + lien, avec rôles.
+- **Rôles** : Propriétaire (tous droits), Éditeur (modifie), Invité (lecture seule).
+- **Traçabilité** : chaque modification est enregistrée (onglet Activité).
+- **Interface refondue** : sidebar + pages, responsive mobile (bottom-nav).
 
-## Setup
+## Pages
+- **Tableau de bord** : prochaines gardes, actions rapides, chiffres clés.
+- **Mes plannings** : onglets « Mes plannings » / « Partagés avec moi ».
+- **Planning** (par planning) : onglets Planning · Internes · Statistiques · Équipe · Activité.
+- **Invitations** : génère code/lien/QR par planning, avec rôle.
 
-### 1. Firebase
-1. Crée un projet sur https://console.firebase.google.com
-2. Active **Firestore Database** (mode test pour démarrer)
-3. Active **Authentication → Google**
-4. Copie ta config dans `src/lib/firebase.js` (remplace les `VOTRE_...`)
+## Setup Firebase
+Config déjà intégrée (`src/lib/firebase.js`). Il faut :
+1. **Authentication → Google** activé.
+2. **Firestore → Règles** : colle le contenu de `FIRESTORE_RULES.txt`, puis Publier.
+3. Après déploiement Netlify : **Authentication → Settings → Domaines autorisés**
+   → ajoute ton domaine `xxx.netlify.app`.
 
-### 2. Règles Firestore (production conseillée)
+> ⚠️ Sécurité : les règles fournies autorisent tout utilisateur **connecté**
+> à lire/écrire les plannings (le filtrage d'accès se fait dans l'app via la
+> liste des membres). C'est suffisant pour démarrer en équipe de confiance.
+> Pour un usage large/public, il faudra durcir les règles (vérifier l'appartenance
+> aux `membres` côté serveur) — on le fera dans un second temps.
+
+## Déploiement Netlify (via GitHub)
+1. Pousse le projet sur GitHub (fichiers à la **racine** du repo).
+2. Netlify → Import from GitHub → le `netlify.toml` configure tout.
+3. Build : `npm install && npm run build` · Publish : `dist` · Node 18.
+
+## Modèle de données (Firestore)
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /internes/{doc}  { allow read: if true; allow write: if request.auth != null; }
-    match /semestres/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /admins/{email}  { allow read: if true; allow write: if request.auth != null; }
-  }
-}
+users/{email}                    profil (nom, photo, uid)
+plannings/{id}                   nom, annee, type, ownerEmail, internes[], gardes{}, statut
+plannings/{id}/membres/{email}   email, nom, role (proprietaire|editeur|invite)
+plannings/{id}/historique/{auto} email, nom, action, detail, at   (traçabilité)
+invitations/{code}               planningId, planningNom, role, createdBy, usedBy[]
 ```
-> Le 1er utilisateur Google qui se connecte devient automatiquement admin
-> (collection `admins`). Pour restreindre, édite cette collection à la main ensuite.
 
-### 3. Déploiement Netlify
-Connecte le repo GitHub à Netlify :
-- Build command : `npm install && npm run build`
-- Publish directory : `dist`
-- Variable d'env : `NODE_VERSION = 18`
-
-Le fichier `netlify.toml` configure déjà le build et le fallback SPA.
-
-### 4. Domaine autorisé
-Dans Firebase → Authentication → Settings → Domaines autorisés,
-ajoute ton domaine Netlify (`xxx.netlify.app`).
-
-## Utilisation
-1. Connecte-toi avec Google (bouton en haut à droite) → tu deviens admin.
-2. **Gérer les internes** : ajoute noms, initiales, couleurs, plafonds.
-3. **Nouveau semestre** : choisis année + type, coche les internes à reprendre.
-4. Sur le planning : clique une case **Garde** (menu déroulant). Repos auto,
-   V+D et doublons détectés. Colonne **Code** : CA / F / A / AR.
-5. Les **stats** en bas se recalculent en direct.
-
-## Structure
+## Structure du code
 ```
 src/
-  main.jsx / App.jsx           routing
-  lib/firebase.js              config + helpers Firestore/Auth
-  lib/semester.js              logique métier (dates, blocs, V+D, doublons, stats)
-  contexts/AuthContext.jsx     auth Google + détection admin
+  main.jsx / App.jsx                routing + auth gate
+  contexts/AuthContext.jsx          auth Google + profil
+  lib/firebase.js                   config + helpers Firestore/Auth
+  lib/semester.js                   logique métier (dates, blocs, V+D, doublons, stats)
+  lib/usePlannings.js               hook : mes plannings + partagés
   components/
-    TopBar.jsx                 barre de navigation
-    Home.jsx                   liste semestres + actions
-    NewSemesterModal.jsx       création semestre + reprise internes
-    PlanningView.jsx           grille 3 blocs + édition
-    StatsPanel.jsx             tableau de stats + légende
-    InternesManager.jsx        CRUD internes
-  styles/index.css             design system
+    AuthGate.jsx                    écran de connexion
+    Layout.jsx                      sidebar + bottom-nav mobile
+    Dashboard.jsx                   tableau de bord
+    PlanningsList.jsx               liste (onglets Mes / Partagés)
+    NewPlanningModal.jsx            création de planning
+    PlanningView.jsx                planning + internes + stats + équipe + activité
+    Invitations.jsx                 génération code/lien/QR
+    JoinPage.jsx                    rejoindre via /join/:code
+    QRCode.jsx                      QR code (api.qrserver.com)
+  styles/index.css                  design system
 ```

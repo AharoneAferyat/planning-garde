@@ -1,23 +1,26 @@
 import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
-import TopBar from './components/TopBar';
-import Home from './components/Home';
+import AuthGate from './components/AuthGate';
+import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
+import PlanningsList from './components/PlanningsList';
 import PlanningView from './components/PlanningView';
-import InternesManager from './components/InternesManager';
+import Invitations from './components/Invitations';
+import JoinPage from './components/JoinPage';
 
 export default function App() {
-  const { loading } = useAuth();
-  if (loading) {
-    return <div className="loading-screen"><div className="spinner" /></div>;
-  }
+  const { user, loading } = useAuth();
+  if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
+  if (!user) return <AuthGate />;
   return (
-    <div className="app">
-      <TopBar />
+    <Layout>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/semestre/:id" element={<PlanningView />} />
-        <Route path="/internes" element={<InternesManager />} />
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/plannings" element={<PlanningsList />} />
+        <Route path="/planning/:id" element={<PlanningView />} />
+        <Route path="/invitations" element={<Invitations />} />
+        <Route path="/join/:code" element={<JoinPage />} />
       </Routes>
-    </div>
+    </Layout>
   );
 }

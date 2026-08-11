@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Profils utilisateurs : chacun lit/écrit le sien
+    match /users/{email} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email == email;
+    }
+
+    // Plannings : lecture pour tout utilisateur connecté (le filtrage se fait
+    // côté app via membres). Écriture réservée aux connectés.
+    match /plannings/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+
+      // Sous-collections : membres, historique
+      match /membres/{email} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+      match /historique/{doc} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+      }
+    }
+
+    // Invitations : lecture/écriture pour connectés (nécessaire pour rejoindre)
+    match /invitations/{code} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

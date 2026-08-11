@@ -1,32 +1,35 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { watchAuth, ensureAdmin, loginGoogle, logout } from '../lib/firebase';
+import { watchAuth, upsertUser, loginGoogle, logout } from '../lib/firebase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState(null);   // { email, nom, photo, uid }
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     return watchAuth(async (u) => {
-      setUser(u);
       if (u) {
-        try {
-          const ok = await ensureAdmin(u.email);
-          setIsAdmin(ok);
-        } catch {
-          setIsAdmin(false);
-        }
+        const profile = {
+          email: u.email,
+          nom: u.displayName || u.email,
+          photo: u.photoURL || '',
+          uid: u.uid,
+        };
+        setUser(profile);
+        try { await upsertUser(u); } catch { /* offline ok */ }
       } else {
-        setIsAdmin(false);
+        setUser(null);
       }
       setLoading(false);
     });
   }, []);
 
-  const value = { user, isAdmin, loading, login: loginGoogle, logout };
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, login: loginGoogle, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);
