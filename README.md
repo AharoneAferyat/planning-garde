@@ -74,3 +74,14 @@ ne casse jamais). Si tu veux une **vraie photo** :
 2. Clic droit → « Copier l'adresse de l'image » (URL en `images.unsplash.com/...`).
 3. Ouvre `src/components/Hero.jsx`, colle l'URL dans la constante `HOSPITAL_IMG`.
    La photo s'affichera derrière le dégradé (opacité réduite pour la lisibilité).
+
+## Mise à jour — planning avancé
+- **Planning en lignes aérées** : plus lisible, repos affiché, V+D marqué.
+- **Bornes réelles** : le semestre va du **1er lundi** au **dernier dimanche** (plus du 1er au 30).
+- **Présences** (onglet dédié + lié aux gardes) : statuts P, G, RS, CA, FCP, FCC, AB.
+  G (jour de garde) et RS (lendemain) sont **automatiques** ; le reste se saisit en cliquant.
+- **Conflit signalé** : un interne de garde marqué absent apparaît en **rouge** (« absent ! »)
+  sans bloquer la saisie.
+- **Statistiques « à ce jour »** : gardes **faites** vs **à venir**, actualisées selon la date.
+- **Répartition automatique** (bouton ⚡) : remplit équitablement en respectant
+  max/mois, max/semestre, jamais 2 gardes de suite, et équilibrage des week-ends.

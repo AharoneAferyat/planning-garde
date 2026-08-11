@@ -64,6 +64,8 @@ export const updatePlanningGardes = (id, gardes) =>
   updateDoc(doc(db, 'plannings', id), { gardes });
 export const updatePlanningInternes = (id, internes) =>
   updateDoc(doc(db, 'plannings', id), { internes });
+export const updatePlanningPresences = (id, presences) =>
+  updateDoc(doc(db, 'plannings', id), { presences });
 
 // Plannings dont je suis owner
 export const watchMyPlannings = (email, cb) =>
