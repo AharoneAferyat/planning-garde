@@ -156,7 +156,7 @@ export default function PlanningView() {
 
       {tab === 'presences' && (
         <PresencesTab months={months} internes={internes} gardes={gardes} presences={presences}
-          editable={canEdit} onSet={setPresence} />
+          editable={canEdit} onSetPresence={setPresence} onSetGarde={setGarde} holidays={holidays} />
       )}
 
       {tab === 'internes' && (
@@ -250,81 +250,182 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
 }
 
 // ---------- Présences ----------
-function PresencesTab({ months, internes, gardes, presences, editable, onSet }) {
+function PresencesTab({ months, internes, gardes, presences, editable, onSetPresence, onSetGarde, holidays }) {
   const allDays = months.flatMap((m) => m.days);
   const names = internes.map((i) => i.nom);
   const eff = useMemo(() => computePresences(gardes, presences, allDays, names), [gardes, presences, allDays, names]);
   const [monthIdx, setMonthIdx] = useState(0);
+  const [menu, setMenu] = useState(null); // { iso, nom, x, y }
   const m = months[monthIdx];
   if (!m) return <div className="card"><div className="empty">Aucun interne / mois.</div></div>;
 
-  const cycle = (iso, nom) => {
+  const openMenu = (e, iso, nom) => {
     if (!editable) return;
-    // cycle manuel : (vide) -> P -> CA -> FCP -> FCC -> AB -> (vide). G/RS sont auto (non éditables ici).
-    const order = ['', 'P', 'CA', 'FCP', 'FCC', 'AB'];
-    const cur = presences?.[iso]?.[nom] || '';
-    const nextCode = order[(order.indexOf(cur) + 1) % order.length];
-    onSet(iso, nom, nextCode);
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenu({ iso, nom, x: r.left, y: r.bottom + window.scrollY });
   };
 
+  const applyStatus = (iso, nom, code) => {
+    // G : pose/retire la garde du jour (un seul interne de garde par jour)
+    if (code === 'G') {
+      onSetGarde(iso, nom, dateLabelOf(iso));
+      onSetPresence(iso, nom, ''); // on efface une éventuelle saisie manuelle, G devient auto
+    } else if (code === '') {
+      // vide : si l'interne était de garde ce jour, on retire la garde ; sinon efface le statut manuel
+      if (gardes?.[iso]?.garde === nom) onSetGarde(iso, '', dateLabelOf(iso));
+      onSetPresence(iso, nom, '');
+    } else {
+      // statut manuel (CA/FCP/FCC/AB/RS/P). Si l'interne était de garde, on l'enlève d'abord.
+      if (gardes?.[iso]?.garde === nom) onSetGarde(iso, '', dateLabelOf(iso));
+      onSetPresence(iso, nom, code);
+    }
+    setMenu(null);
+  };
+
+  // Totaux de la période (tout le semestre)
+  const totals = useMemo(() => {
+    const t = { G: 0, RS: 0, CA: 0, FCP: 0, FCC: 0, AB: 0 };
+    allDays.forEach((d) => {
+      names.forEach((nom) => {
+        const c = eff[d.iso]?.[nom];
+        if (c && t[c] !== undefined) t[c] += 1;
+      });
+    });
+    return t;
+  }, [eff, allDays, names]);
+
+  const initials = (nom) => nom.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
   return (
-    <div className="card">
-      <div className="card-h">Présences — {MONTHS_FR[m.month]} {m.year}
-        <div className="spacer" />
-        <div className="row">
-          <button className="btn-icon" onClick={() => setMonthIdx(Math.max(0, monthIdx - 1))} disabled={monthIdx === 0}>‹</button>
-          <button className="btn-icon" onClick={() => setMonthIdx(Math.min(months.length - 1, monthIdx + 1))} disabled={monthIdx === months.length - 1}>›</button>
+    <>
+      <div className="card">
+        <div className="card-h">Présences
+          <div className="spacer" />
+          <div className="row">
+            <button className="btn secondary sm" onClick={() => setMonthIdx(0)}>Aujourd'hui</button>
+            <button className="btn-icon" onClick={() => setMonthIdx(Math.max(0, monthIdx - 1))} disabled={monthIdx === 0}>‹</button>
+            <span style={{ fontWeight: 700, minWidth: 130, textAlign: 'center' }}>{MONTHS_FR[m.month]} {m.year}</span>
+            <button className="btn-icon" onClick={() => setMonthIdx(Math.min(months.length - 1, monthIdx + 1))} disabled={monthIdx === months.length - 1}>›</button>
+          </div>
         </div>
-      </div>
-      <div className="card-b">
-        <div className="pres-wrap">
-          <table className="pres-tbl">
-            <thead>
-              <tr>
-                <th className="corner">Interne</th>
-                {m.days.map((d) => (
-                  <th key={d.iso} className={d.isSun ? 'sun' : d.isWeekend ? 'we' : ''}>
-                    {DAYS_FR[d.weekday][0]}<br />{String(d.day).padStart(2, '0')}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {names.map((nom) => (
-                <tr key={nom}>
-                  <td className="rowhead">{nom}</td>
+        <div className="card-b">
+          <div className="pres-legend" style={{ marginBottom: '.9rem', marginTop: 0 }}>
+            {PRESENCE_STATUSES.map((s) => (
+              <span className="pl" key={s.code}>
+                <span className="sw" style={{ background: s.color, color: s.text }}>{s.code}</span>
+                {s.label}
+              </span>
+            ))}
+            <span className="pl"><span className="sw" style={{ background: '#f1f5f9', color: '#94a3b8' }}>–</span>Vide</span>
+          </div>
+
+          <div className="pres-wrap">
+            <table className="pres-tbl">
+              <thead>
+                <tr>
+                  <th className="corner">Internes</th>
                   {m.days.map((d) => {
-                    const code = eff[d.iso]?.[nom] || '';
-                    const st = PRESENCE_MAP[code];
+                    const ferie = holidays.has(d.iso);
                     return (
-                      <td key={d.iso} className={`pres-cell ${editable ? '' : 'readonly'}`}
-                        style={{ background: st ? st.color : undefined, color: st ? st.text : 'var(--muted-2)' }}
-                        title={st ? st.label : 'Cliquer pour définir'}
-                        onClick={() => cycle(d.iso, nom)}>
-                        {code}
-                      </td>
+                      <th key={d.iso} className={ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : ''} title={ferie ? holidayName(d.iso) : ''}>
+                        {DAYS_FR[d.weekday].toUpperCase()}<br />{String(d.day).padStart(2, '0')}
+                      </th>
                     );
                   })}
                 </tr>
-              ))}
-              {names.length === 0 && <tr><td className="rowhead">—</td><td colSpan={m.days.length}><div className="empty" style={{ padding: '1rem' }}>Aucun interne.</div></td></tr>}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {internes.map((it) => (
+                  <tr key={it.nom}>
+                    <td className="rowhead">
+                      <div className="row" style={{ gap: '.5rem' }}>
+                        <span className="ini" style={{ background: it.couleur || '#e2e8f0' }}>{initials(it.nom)}</span>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{it.nom}</div>
+                          {it.role && <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>{it.role}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    {m.days.map((d) => {
+                      const code = eff[d.iso]?.[it.nom] || '';
+                      const st = PRESENCE_MAP[code];
+                      const ferie = holidays.has(d.iso);
+                      const wecls = ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
+                      return (
+                        <td key={d.iso}
+                          className={`pres-cell ${editable ? '' : 'readonly'} ${!code ? wecls : ''}`}
+                          style={code ? { background: st?.color, color: st?.text } : undefined}
+                          title={st ? st.label : ''}
+                          onClick={(e) => openMenu(e, d.iso, it.nom)}>
+                          {code || (editable ? '' : '')}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                {internes.length === 0 && <tr><td className="rowhead">—</td><td colSpan={m.days.length}><div className="empty" style={{ padding: '1rem' }}>Aucun interne.</div></td></tr>}
+              </tbody>
+            </table>
+          </div>
+          {editable && <div style={{ marginTop: '.6rem', fontSize: '.76rem', color: 'var(--muted)' }}>
+            Clique une case pour définir le statut. « Garde » pose la garde du jour (G) et le repos de sécurité (RS) se met automatiquement le lendemain.
+          </div>}
         </div>
-        <div className="pres-legend">
-          {PRESENCE_STATUSES.map((s) => (
-            <span className="pl" key={s.code}>
-              <span className="sw" style={{ background: s.color }} />
-              <b>{s.code}</b> {s.label}{s.auto ? ' (auto)' : ''}
-            </span>
-          ))}
-        </div>
-        {editable && <div style={{ marginTop: '.6rem', fontSize: '.76rem', color: 'var(--muted)' }}>
-          Clique une case pour changer le statut (P → CA → FCP → FCC → AB → vide). G et RS se posent automatiquement selon les gardes.
-        </div>}
       </div>
+
+      {/* Résumé de la période */}
+      <div className="grid cols-3" style={{ marginTop: '1.25rem' }}>
+        <SummaryCard ic="☰" cls="blue" v={totals.G} l="Gardes planifiées" />
+        <SummaryCard ic="☾" cls="purple" v={totals.RS} l="Repos de sécurité" />
+        <SummaryCard ic="✈" cls="green" v={totals.CA} l="Congés" />
+        <SummaryCard ic="◈" cls="amber" v={totals.FCP} l="Formations perso" />
+        <SummaryCard ic="◆" cls="amber" v={totals.FCC} l="Formations coordo" />
+        <SummaryCard ic="✚" cls="red" v={totals.AB} l="Absences" />
+      </div>
+
+      {menu && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setMenu(null)} />
+          <div className="pres-menu" style={{ left: menu.x, top: menu.y }}>
+            {[
+              { code: 'G', label: 'Garde' },
+              { code: 'RS', label: 'Repos sécurité' },
+              { code: 'CA', label: 'Congé' },
+              { code: 'FCP', label: 'Formation perso' },
+              { code: 'FCC', label: 'Formation coordo' },
+              { code: 'AB', label: 'Absence' },
+              { code: '', label: 'Vide' },
+            ].map((o) => {
+              const st = PRESENCE_MAP[o.code];
+              return (
+                <button key={o.code || 'vide'} className="pres-menu-item"
+                  onClick={() => applyStatus(menu.iso, menu.nom, o.code)}>
+                  <span className="sw" style={{ background: st ? st.color : '#f1f5f9', color: st ? st.text : '#94a3b8' }}>
+                    {o.code || '–'}
+                  </span>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function SummaryCard({ ic, cls, v, l }) {
+  return (
+    <div className="stat">
+      <div className={`ic ${cls}`}>{ic}</div>
+      <div><div className="v">{v}</div><div className="l">{l}</div></div>
     </div>
   );
+}
+
+function dateLabelOf(iso) {
+  const [y, mo, d] = iso.split('-');
+  return `${d}/${mo}`;
 }
 
 // ---------- Stats "à ce jour" ----------

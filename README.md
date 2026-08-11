@@ -97,3 +97,13 @@ ne casse jamais). Si tu veux une **vraie photo** :
 - **Internes liés aux invitations** : en rejoignant via lien, chacun choisit « je suis untel »
   et met son prénom → le planning se met à jour, et le dashboard « prochaine garde »
   repère tes gardes (★).
+
+## Mise à jour — onglet Présences façon grille + fond photo Unsplash
+- **Onglet Présences** refait en **grille internes × jours** (façon planning mural) :
+  clic sur une case → menu (Garde, RS, Congé, FCP, FCC, Absence, Vide).
+  Poser « Garde » crée la garde du jour (G) ; RS se met auto le lendemain.
+  Les gardes sont modifiables depuis le Planning ET depuis cette grille.
+- **Résumé de la période** : cartes de totaux (gardes, RS, congés, FCP, FCC, absences).
+- **Fond photo aléatoire** : le header du tableau de bord charge une photo d'hôpital
+  Unsplash différente à chaque ouverture (bouton ⟳ pour changer, crédit photographe,
+  fallback dégradé si l'API ne répond pas). Clé Access Unsplash intégrée.

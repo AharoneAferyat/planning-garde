@@ -330,3 +330,15 @@ a{color:inherit;text-decoration:none}
 .hero-credit{position:absolute;bottom:.5rem;right:.75rem;z-index:2;font-size:.68rem;color:rgba(255,255,255,.75);
   text-decoration:none}
 .hero-credit:hover{color:#fff;text-decoration:underline}
+
+/* ---------- Présences façon mockup ---------- */
+.pres-legend .sw{width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.62rem;border:1px solid rgba(0,0,0,.06)}
+.pres-tbl thead th.fer{background:#e0edff;color:#2563eb}
+.rowhead .ini{width:30px;height:30px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.66rem;color:#fff;flex-shrink:0}
+.pres-cell{transition:background .1s;border-radius:0}
+.pres-cell:hover{outline:2px solid var(--blue);outline-offset:-2px;z-index:1;position:relative}
+.pres-menu{position:absolute;z-index:100;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);padding:.35rem;min-width:190px;display:flex;flex-direction:column;gap:.1rem}
+.pres-menu-item{display:flex;align-items:center;gap:.55rem;padding:.4rem .55rem;border-radius:7px;font-size:.82rem;font-weight:600;text-align:left;width:100%}
+.pres-menu-item:hover{background:var(--bg-2)}
+.pres-menu-item .sw{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.64rem;border:1px solid rgba(0,0,0,.06);flex-shrink:0}
+.grid.cols-3 .stat .ic.red{background:var(--red-l);color:var(--red)}
