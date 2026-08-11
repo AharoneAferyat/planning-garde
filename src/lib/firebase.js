@@ -67,6 +67,18 @@ export const updatePlanningInternes = (id, internes) =>
 export const updatePlanningPresences = (id, presences) =>
   updateDoc(doc(db, 'plannings', id), { presences });
 
+// "Je suis untel" : relie l'utilisateur courant à un interne du planning.
+// idx = index de l'interne dans le tableau ; prenom = nouveau nom affiché.
+export const claimInterne = async (planningId, idx, prenom, userEmail) => {
+  const ref = doc(db, 'plannings', planningId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const internes = (data.internes || []).map((it, i) =>
+    i === idx ? { ...it, nom: prenom, email: userEmail } : it);
+  await updateDoc(ref, { internes });
+};
+
 // Plannings dont je suis owner
 export const watchMyPlannings = (email, cb) =>
   onSnapshot(

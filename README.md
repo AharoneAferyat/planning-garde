@@ -85,3 +85,15 @@ ne casse jamais). Si tu veux une **vraie photo** :
 - **Statistiques « à ce jour »** : gardes **faites** vs **à venir**, actualisées selon la date.
 - **Répartition automatique** (bouton ⚡) : remplit équitablement en respectant
   max/mois, max/semestre, jamais 2 gardes de suite, et équilibrage des week-ends.
+
+## Mise à jour — valorisation, fériés, invitations liées
+- **Planning en tableau dense** (plus lisible), mois en lignes (Mai/Juin/Juil puis Août/Sept/Oct).
+- **Bornes** : 1er lundi du mois de départ → dimanche avant le 1er lundi du semestre suivant.
+- **Jours fériés France** (11 nationaux, calculés dynamiquement) marqués dans le planning.
+- **Valorisation** : semaine 1× · samedi 1,5× · dimanche & fériés 2× (colonne Val. + Points en stats).
+- **Couleurs internes franches** (bien contrastées).
+- **Répartition auto multi-critères** : équilibre nombre de gardes + points + week-ends/fériés,
+  jamais 2 de suite, respecte plafonds et absences. Modifiable ensuite à la main.
+- **Internes liés aux invitations** : en rejoignant via lien, chacun choisit « je suis untel »
+  et met son prénom → le planning se met à jour, et le dashboard « prochaine garde »
+  repère tes gardes (★).

@@ -15,19 +15,27 @@ export default function Dashboard() {
   const all = [...mine, ...shared];
 
   // Prochaines gardes (toutes plannings confondues), à partir d'aujourd'hui
+  // Prochaines gardes. On repère "mes" gardes : dans chaque planning, l'interne
+  // dont le champ email == mon email me désigne (via "je suis untel").
   const upcoming = useMemo(() => {
     const today = isoDate(new Date());
     const rows = [];
     all.forEach((p) => {
+      const myNames = (p.internes || []).filter((i) => i.email === user?.email).map((i) => i.nom);
       Object.entries(p.gardes || {}).forEach(([iso, cell]) => {
         if (cell.garde && iso >= today) {
-          rows.push({ iso, garde: cell.garde, planning: p.nom, planningId: p.id });
+          rows.push({
+            iso, garde: cell.garde, planning: p.nom, planningId: p.id,
+            mine: myNames.includes(cell.garde),
+          });
         }
       });
     });
     rows.sort((a, b) => a.iso.localeCompare(b.iso));
-    return rows.slice(0, 4);
-  }, [all]);
+    // priorité à mes gardes si j'en ai
+    const mine = rows.filter((r) => r.mine);
+    return (mine.length ? mine : rows).slice(0, 4);
+  }, [all, user?.email]);
 
   // Stats globales
   const totalGardes = all.reduce(
@@ -59,7 +67,9 @@ export default function Dashboard() {
                       <div style={{ fontWeight: 700 }}>{fmtDate(g.iso)}</div>
                       <div style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{g.planning}</div>
                     </div>
-                    <span className="badge blue">{g.garde}</span>
+                    <span className={`badge ${g.mine ? 'green' : 'blue'}`}>
+                      {g.mine ? '★ ' : ''}{g.garde}
+                    </span>
                   </div>
                 ))}
               </div>

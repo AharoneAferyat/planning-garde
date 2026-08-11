@@ -6,13 +6,14 @@ import {
   watchMembres, watchHistorique, logAction, updateMembreRole, removeMembre,
 } from '../lib/firebase';
 import {
-  semesterMonthsWithDays, semesterDays, MONTHS_FR, DAYS_FR,
+  semesterMonthsWithDays, semesterDays, semesterDaysValued, MONTHS_FR, DAYS_FR,
   isVplusD, isDoublon, reposFor, semesterLabel,
   PRESENCE_STATUSES, PRESENCE_MAP, ABSENT_CODES,
-  computePresences, gardeConflit, computeStatsProgress, autoDistribute, isoDate,
+  computePresences, gardeConflit, computeStatsProgress, autoDistributeV2, isoDate,
+  frenchHolidays, holidayName, computePoints,
 } from '../lib/semester';
 
-const PALETTE = ['#bbf7d0', '#bfdbfe', '#fde68a', '#fecaca', '#e9d5ff', '#a5f3fc', '#fed7aa', '#f5d0fe', '#c7d2fe', '#d9f99d'];
+const PALETTE = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#0d9488'];
 
 export default function PlanningView() {
   const { id } = useParams();
@@ -42,6 +43,13 @@ export default function PlanningView() {
 
   const months = useMemo(() => p ? semesterMonthsWithDays(p.annee, p.type) : [], [p?.annee, p?.type]);
   const allDays = useMemo(() => p ? semesterDays(p.annee, p.type) : [], [p?.annee, p?.type]);
+  const holidays = useMemo(() => {
+    if (!p) return new Set();
+    const years = [...new Set(allDays.map((d) => d.year))];
+    const h = new Set();
+    years.forEach((y) => frenchHolidays(y).forEach((iso) => h.add(iso)));
+    return h;
+  }, [allDays, p]);
 
   if (p === undefined) return <div className="loading-screen" style={{ minHeight: 300 }}><div className="spinner" /></div>;
   if (p === null) return (
@@ -95,7 +103,7 @@ export default function PlanningView() {
     if (interneNames.length < 2) { alert('Ajoute au moins 2 internes.'); return; }
     const hasGardes = Object.values(gardes).some((c) => c.garde);
     if (hasGardes && !confirm('Remplacer le planning actuel par une répartition automatique équilibrée ?')) return;
-    const dist = autoDistribute(allDays, internes, { presences, seed: Date.now() });
+    const dist = autoDistributeV2(allDays, internes, { presences, holidays, seed: Date.now() });
     const next = {};
     Object.entries(dist).forEach(([iso, nom]) => { next[iso] = { ...(gardes[iso] || {}), garde: nom }; });
     setGardes(next);
@@ -135,14 +143,11 @@ export default function PlanningView() {
               {canEdit && <button className="btn" onClick={runAuto}>⚡ Proposer une répartition</button>}
             </div>
             <div className="blocks">
-              {chunk3(months).map((col, ci) => (
-                <div key={ci}>
-                  {col.map((m) => (
-                    <PlanningMonth key={`${m.year}-${m.month}`} m={m}
-                      gardes={gardes} presences={presences} internes={interneNames}
-                      interneColor={interneColor} editable={canEdit} onSet={setGarde} todayIso={todayIso} />
-                  ))}
-                </div>
+              {months.map((m) => (
+                <PlanningMonth key={`${m.year}-${m.month}`} m={m}
+                  gardes={gardes} presences={presences} internes={interneNames}
+                  interneColor={interneColor} editable={canEdit} onSet={setGarde}
+                  todayIso={todayIso} holidays={holidays} />
               ))}
             </div>
           </>
@@ -181,54 +186,65 @@ export default function PlanningView() {
         </div>
       )}
 
-      {tab === 'stats' && <StatsProgress gardes={gardes} internes={internes} days={allDays} todayIso={todayIso} />}
+      {tab === 'stats' && <StatsProgress gardes={gardes} internes={internes} days={allDays} todayIso={todayIso} holidays={holidays} />}
       {tab === 'equipe' && isOwner && <TeamPanel planningId={id} membres={membres} ownerEmail={p.ownerEmail} />}
       {tab === 'activite' && <ActivityPanel histo={histo} />}
     </>
   );
 }
 
-// ---------- Planning mois en lignes ----------
-function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso }) {
+// ---------- Planning mois V1 : tableau dense ----------
+function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso, holidays }) {
   const days = m.days;
   const byIso = {}; days.forEach((d) => { byIso[d.iso] = d; });
   return (
-    <div className="pmonth">
-      <div className="pmonth-h">{MONTHS_FR[m.month]} {m.year}</div>
-      <div className={`pmonth-b ${editable ? '' : 'readonly'}`}>
-        {days.map((d, i) => {
-          const prevIso = prevDayIso(d.iso);
-          const cell = gardes[d.iso] || {};
-          const garde = cell.garde || '';
-          const repos = reposFor(gardes, prevIso);
-          const doublon = isDoublon(gardes, d.iso, prevIso);
-          const vd = isVplusD(gardes, d, byIso);
-          const conflit = gardeConflit(gardes, presences, d.iso, garde);
-          const rc = d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
-          const bg = garde && !doublon && !conflit ? interneColor[garde] : undefined;
-          const dl = `${DAYS_FR[d.weekday]} ${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}`;
-          return (
-            <div key={d.iso} className={`lrow ${rc} ${conflit ? 'conflit' : ''}`}>
-              <div className="ld">{DAYS_FR[d.weekday]} <span className="dnum">{String(d.day).padStart(2, '0')}/{String(d.month).padStart(2, '0')}</span></div>
-              <div className="lg">
-                {editable ? (
-                  <select className="lsel" value={garde}
-                    style={garde && !doublon && !conflit ? { background: bg, border: '1px solid rgba(0,0,0,.05)', color: '#0f172a', borderRadius: 999 } : undefined}
-                    onChange={(e) => onSet(d.iso, e.target.value, dl)}>
-                    <option value="">+ garde</option>
-                    {internes.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                ) : (
-                  garde && <span className={`lchip ${doublon || conflit ? 'doublon' : ''}`} style={{ background: bg }}>{garde}</span>
-                )}
-              </div>
-              {conflit && <span className="conflit-warn">absent !</span>}
-              <div className="lvd">{vd ? 'V+D' : ''}</div>
-              <div className="lrepos">{repos && `repos : ${repos}`}</div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="pm">
+      <div className="pm-h">{MONTHS_FR[m.month]} {m.year}</div>
+      <table className={`pt ${editable ? '' : 'readonly'}`}>
+        <thead>
+          <tr><th style={{ textAlign: 'left' }}>Jour</th><th>Garde</th><th>Repos</th><th>V+D</th><th>Val.</th></tr>
+        </thead>
+        <tbody>
+          {days.map((d) => {
+            const prevIso = prevDayIso(d.iso);
+            const garde = gardes[d.iso]?.garde || '';
+            const repos = reposFor(gardes, prevIso);
+            const doublon = isDoublon(gardes, d.iso, prevIso);
+            const vd = isVplusD(gardes, d, byIso);
+            const conflit = gardeConflit(gardes, presences, d.iso, garde);
+            const ferie = holidays.has(d.iso);
+            const val = ferie || d.isSun ? '2×' : d.isSat ? '1,5×' : '1×';
+            const rc = conflit ? 'conflit' : ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
+            const bad = doublon || conflit;
+            const col = interneColor[garde];
+            const dl = `${DAYS_FR[d.weekday]} ${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}`;
+            return (
+              <tr key={d.iso} className={rc}>
+                <td className="pdd">
+                  {DAYS_FR[d.weekday]} <b>{String(d.day).padStart(2, '0')}/{String(d.month).padStart(2, '0')}</b>
+                  {ferie && <span className="ferbadge" title={holidayName(d.iso)}>FÉRIÉ</span>}
+                </td>
+                <td>
+                  {editable ? (
+                    <select className={`psel ${garde && !bad ? 'filled' : ''}`}
+                      value={garde}
+                      style={garde && !bad ? { background: col } : undefined}
+                      onChange={(e) => onSet(d.iso, e.target.value, dl)}>
+                      <option value="" style={{ color: '#334155' }}>+ garde</option>
+                      {internes.map((n) => <option key={n} value={n} style={{ color: '#334155' }}>{n}</option>)}
+                    </select>
+                  ) : (
+                    garde && <span className={`pchip ${bad ? 'bad' : ''}`} style={{ background: bad ? undefined : col }}>{garde}</span>
+                  )}
+                </td>
+                <td className="prep">{repos}</td>
+                <td className="pvd">{vd ? 'V+D' : ''}</td>
+                <td className="pval">{val}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -312,13 +328,14 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSet }) 
 }
 
 // ---------- Stats "à ce jour" ----------
-function StatsProgress({ gardes, internes, days, todayIso }) {
+function StatsProgress({ gardes, internes, days, todayIso, holidays }) {
   const stats = useMemo(() => computeStatsProgress(gardes, internes.map((i) => i.nom), days, todayIso), [gardes, internes, days, todayIso]);
+  const points = useMemo(() => computePoints(gardes, internes.map((i) => i.nom), days, holidays), [gardes, internes, days, holidays]);
   const rows = internes.map((it) => {
     const s = stats[it.nom] || { faites: 0, prevues: 0, restantes: 0, samPrev: 0, dimPrev: 0, vdPrev: 0, repos: 0 };
+    const pt = points[it.nom] || { total: 0, ferie: 0 };
     const max = it.maxSem ?? 25;
-    const pctDone = s.prevues ? Math.round((s.faites / s.prevues) * 100) : 0;
-    return { nom: it.nom, ...s, max, pctDone };
+    return { nom: it.nom, ...s, max, pts: pt.total, ferie: pt.ferie };
   });
   const maxPrev = Math.max(1, ...rows.map((r) => r.prevues));
 
@@ -356,7 +373,7 @@ function StatsProgress({ gardes, internes, days, todayIso }) {
             <table className="stats-tbl">
               <thead><tr>
                 <th>Interne</th><th>Faites</th><th>À venir</th><th>Total prévu</th><th>Max</th>
-                <th>Samedis</th><th>Dimanches</th><th>V+D</th><th>Repos</th>
+                <th>Samedis</th><th>Dimanches</th><th>Fériés</th><th>V+D</th><th>Points</th><th>Repos</th>
               </tr></thead>
               <tbody>
                 {rows.map((r) => (
@@ -368,7 +385,9 @@ function StatsProgress({ gardes, internes, days, todayIso }) {
                     <td>{r.max}</td>
                     <td>{r.samPrev}</td>
                     <td>{r.dimPrev}</td>
+                    <td>{r.ferie}</td>
                     <td>{r.vdPrev}</td>
+                    <td><b>{String(r.pts).replace('.', ',')}</b></td>
                     <td>{r.repos}</td>
                   </tr>
                 ))}
@@ -376,9 +395,9 @@ function StatsProgress({ gardes, internes, days, todayIso }) {
             </table>
           </div>
           <div style={{ padding: '.9rem 1.1rem', fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.7 }}>
-            <b>Faites</b> = gardes déjà passées · <b>À venir</b> = gardes prévues restantes ·{' '}
-            <b>Total prévu</b> = faites + à venir. Chiffres actualisés selon la date du jour.
-            <b> V+D</b> = gros week-end (vendredi + dimanche). Case garde en <b style={{ color: 'var(--red)' }}>rouge</b> = doublon ou interne absent.
+            <b>Faites</b> = gardes déjà passées · <b>À venir</b> = restantes · <b>Points</b> = valorisation
+            (semaine 1× · samedi 1,5× · dimanche &amp; fériés 2×). Chiffres actualisés selon la date du jour.
+            Case garde en <b style={{ color: 'var(--red)' }}>rouge</b> = doublon ou interne absent ce jour.
           </div>
         </div>
       </div>
@@ -443,12 +462,6 @@ function ActivityPanel({ histo }) {
 }
 
 // ---------- utils ----------
-function chunk3(months) {
-  // répartit N mois en 3 colonnes équilibrées, ordre chronologique par colonne
-  const per = Math.ceil(months.length / 3);
-  return [months.slice(0, per), months.slice(per, per * 2), months.slice(per * 2)];
-}
-function idxPrev(days, i) { return i > 0 ? days[i - 1] : null; }
 function prevDayIso(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(y, m - 1, d);

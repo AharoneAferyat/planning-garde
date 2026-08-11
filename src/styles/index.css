@@ -299,3 +299,34 @@ a{color:inherit;text-decoration:none}
   .prog-row{flex-wrap:wrap}.prog-row .pname{width:100%}.prog-meta{width:auto}
   .lrow .lrepos{display:none}
 }
+
+/* ---------- Planning V1 : tableau dense ---------- */
+.pm{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1rem;box-shadow:var(--shadow)}
+.pm-h{background:linear-gradient(120deg,#1e3a8a,#2563eb);color:#fff;font-weight:700;padding:.55rem;text-align:center;font-size:.9rem}
+.pt{width:100%;border-collapse:collapse}
+.pt th{background:#f1f5f9;color:#64748b;font-size:.64rem;text-transform:uppercase;letter-spacing:.4px;padding:.35rem .4rem;font-weight:700;border-bottom:1px solid var(--line)}
+.pt td{padding:.26rem .45rem;font-size:.79rem;border-bottom:1px solid #eef2f7;text-align:center;height:29px}
+.pt tr:last-child td{border-bottom:none}
+.pt tr.we td{background:#fdf9f0}.pt tr.sun td{background:#fdf4f7}.pt tr.fer td{background:#eef6ff}
+.pt tr.conflit td{background:var(--red-l)}
+.pt .pdd{color:#94a3b8;font-weight:600;text-align:left;white-space:nowrap}
+.pt .pdd b{color:#334155}
+.pt .pchip{display:inline-block;padding:.16rem .6rem;border-radius:7px;font-weight:700;font-size:.76rem;color:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pt .pchip.bad{background:#fff!important;color:var(--red);border:1.5px solid var(--red)}
+.pt .prep{color:#94a3b8;font-style:italic;font-size:.71rem}
+.pt .pval{font-size:.66rem;color:#64748b;font-weight:700;width:36px}
+.pt .pvd{font-size:.6rem;color:var(--amber);font-weight:800;width:30px}
+.ferbadge{font-size:.56rem;color:#2563eb;font-weight:800;margin-left:.25rem;vertical-align:middle}
+.psel{border:1px dashed var(--line);border-radius:7px;padding:.16rem .45rem;background:transparent;color:#94a3b8;font-weight:700;font-size:.76rem;cursor:pointer;appearance:none;max-width:130px}
+.psel:hover{border-color:var(--blue);color:var(--blue)}
+.psel.filled{border-style:solid;border-color:transparent;color:#fff}
+.readonly .psel{pointer-events:none}
+
+/* ---------- Hero : bouton refresh + crédit photo ---------- */
+.hero-refresh{position:absolute;top:.7rem;right:.7rem;z-index:2;width:32px;height:32px;border-radius:8px;
+  background:rgba(255,255,255,.18);color:#fff;font-size:1rem;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);transition:.15s}
+.hero-refresh:hover{background:rgba(255,255,255,.3);transform:rotate(90deg)}
+.hero-credit{position:absolute;bottom:.5rem;right:.75rem;z-index:2;font-size:.68rem;color:rgba(255,255,255,.75);
+  text-decoration:none}
+.hero-credit:hover{color:#fff;text-decoration:underline}

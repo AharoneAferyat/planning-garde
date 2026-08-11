@@ -145,13 +145,18 @@ export function semesterStart(annee, type) {
   return d;
 }
 
-// Dernier dimanche du 6e mois du semestre.
+// Fin du semestre = dimanche précédant le 1er lundi du mois de départ du
+// semestre SUIVANT. (Mai-Oct finit le dimanche avant le 1er lundi de novembre.)
 export function semesterEnd(annee, type) {
-  const months = semesterMonths(annee, type);
-  const last = months[5];
-  const d = new Date(last.year, last.month, 0); // dernier jour du mois
-  while (d.getDay() !== 0) d.setDate(d.getDate() - 1); // reculer jusqu'à dimanche
-  return d;
+  // mois de départ du semestre suivant
+  const nextStartMonth = type === 'nov' ? 5 : 11;
+  const nextYear = type === 'nov' ? annee + 1 : annee;
+  const firstMonday = new Date(nextYear, nextStartMonth - 1, 1);
+  while (firstMonday.getDay() !== 1) firstMonday.setDate(firstMonday.getDate() + 1);
+  // dimanche juste avant
+  const end = new Date(firstMonday);
+  end.setDate(end.getDate() - 1);
+  return end;
 }
 
 // Tous les jours du semestre (1er lundi → dernier dimanche), avec métadonnées.
@@ -340,4 +345,167 @@ export function autoDistribute(days, internes, opts = {}) {
   });
 
   return result; // { iso: nom }
+}
+
+// ============================================================
+//  JOURS FÉRIÉS (France métropole) — calcul dynamique
+// ============================================================
+// Dimanche de Pâques (algorithme de Meeus/Butcher).
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+
+// Renvoie un Set d'ISO des 11 fériés nationaux pour une année.
+export function frenchHolidays(year) {
+  const easter = easterSunday(year);
+  const list = [
+    new Date(year, 0, 1),    // Jour de l'an
+    addDays(easter, 1),      // Lundi de Pâques
+    new Date(year, 4, 1),    // Fête du travail
+    new Date(year, 4, 8),    // Victoire 1945
+    addDays(easter, 39),     // Ascension
+    addDays(easter, 50),     // Lundi de Pentecôte
+    new Date(year, 6, 14),   // Fête nationale
+    new Date(year, 7, 15),   // Assomption
+    new Date(year, 10, 1),   // Toussaint
+    new Date(year, 10, 11),  // Armistice 1918
+    new Date(year, 11, 25),  // Noël
+  ];
+  return new Set(list.map((d) => isoDate(d)));
+}
+// Noms des fériés (pour tooltip).
+export function holidayName(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const year = y;
+  const easter = easterSunday(year);
+  const map = {
+    [isoDate(new Date(year, 0, 1))]: "Jour de l'an",
+    [isoDate(addDays(easter, 1))]: 'Lundi de Pâques',
+    [isoDate(new Date(year, 4, 1))]: 'Fête du travail',
+    [isoDate(new Date(year, 4, 8))]: 'Victoire 1945',
+    [isoDate(addDays(easter, 39))]: 'Ascension',
+    [isoDate(addDays(easter, 50))]: 'Lundi de Pentecôte',
+    [isoDate(new Date(year, 6, 14))]: 'Fête nationale',
+    [isoDate(new Date(year, 7, 15))]: 'Assomption',
+    [isoDate(new Date(year, 10, 1))]: 'Toussaint',
+    [isoDate(new Date(year, 10, 11))]: 'Armistice 1918',
+    [isoDate(new Date(year, 11, 25))]: 'Noël',
+  };
+  return map[iso] || '';
+}
+
+// ============================================================
+//  VALORISATION : semaine 1× · samedi 1,5× · dim/férié 2×
+// ============================================================
+export function gardeValue(day, holidaysSet) {
+  const ferie = holidaysSet ? holidaysSet.has(day.iso) : false;
+  if (day.isSun || ferie) return 2;
+  if (day.isSat) return 1.5;
+  return 1;
+}
+
+// Ajoute isHoliday + value à chaque jour du semestre.
+export function semesterDaysValued(annee, type) {
+  const days = semesterDays(annee, type);
+  const years = [...new Set(days.map((d) => d.year))];
+  const holi = new Set();
+  years.forEach((y) => frenchHolidays(y).forEach((iso) => holi.add(iso)));
+  days.forEach((d) => {
+    d.isHoliday = holi.has(d.iso);
+    d.value = gardeValue(d, holi);
+  });
+  return { days, holidays: holi };
+}
+
+// ============================================================
+//  RÉPARTITION AUTO MULTI-CRITÈRES
+//  Équilibre simultanément : nb de gardes, total de points (valorisation),
+//  et nb de week-ends/fériés "lourds". Jamais 2 de suite. Respecte plafonds
+//  et absences (manuel). On modifie ensuite à la main si besoin.
+// ============================================================
+export function autoDistributeV2(days, internes, opts = {}) {
+  const { presences = {}, holidays = new Set(), maxMoisDefault = 5, maxSemDefault = 25, seed = Date.now() } = opts;
+  let s = seed >>> 0;
+  const rnd = () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+  const names = internes.map((i) => i.nom);
+  const maxMois = Object.fromEntries(internes.map((i) => [i.nom, i.maxMois ?? maxMoisDefault]));
+  const maxSem = Object.fromEntries(internes.map((i) => [i.nom, i.maxSem ?? maxSemDefault]));
+
+  const cntSem = Object.fromEntries(names.map((n) => [n, 0]));
+  const pts = Object.fromEntries(names.map((n) => [n, 0]));
+  const heavy = Object.fromEntries(names.map((n) => [n, 0])); // WE + fériés
+  const cntMois = {};
+  const result = {};
+  let prev = null;
+  const monthKey = (d, n) => `${n}-${d.year}-${d.month}`;
+
+  days.forEach((d) => {
+    const ferie = holidays.has(d.iso);
+    const val = d.isSun || ferie ? 2 : d.isSat ? 1.5 : 1;
+    const isHeavy = d.isWeekend || ferie;
+
+    let cands = names.filter((n) => {
+      if (n === prev) return false;
+      if (cntSem[n] >= maxSem[n]) return false;
+      if ((cntMois[monthKey(d, n)] || 0) >= maxMois[n]) return false;
+      if (ABSENT_CODES.includes(presences?.[d.iso]?.[n])) return false;
+      return true;
+    });
+    if (cands.length === 0) cands = names.filter((n) => n !== prev && cntSem[n] < maxSem[n]);
+    if (cands.length === 0) cands = names.filter((n) => n !== prev);
+    if (cands.length === 0) { prev = null; return; }
+
+    // score composite : on privilégie qui a le moins de points, puis le moins
+    // de jours "lourds" (si le jour est lourd), puis le moins de gardes.
+    cands.sort((a, b) => {
+      const dp = pts[a] - pts[b];
+      if (Math.abs(dp) > 0.01) return dp;
+      if (isHeavy) { const dh = heavy[a] - heavy[b]; if (dh !== 0) return dh; }
+      const dg = cntSem[a] - cntSem[b];
+      if (dg !== 0) return dg;
+      return rnd() - 0.5;
+    });
+    const pool = cands.slice(0, Math.min(2, cands.length));
+    const pick = pool[Math.floor(rnd() * pool.length)];
+
+    result[d.iso] = pick;
+    cntSem[pick] += 1;
+    pts[pick] += val;
+    if (isHeavy) heavy[pick] += 1;
+    cntMois[monthKey(d, pick)] = (cntMois[monthKey(d, pick)] || 0) + 1;
+    prev = pick;
+  });
+
+  return result;
+}
+
+// Stats de points par interne (pour affichage).
+export function computePoints(gardes, internes, days, holidaysSet) {
+  const pts = Object.fromEntries(internes.map((n) => [n, { total: 0, sem: 0, sam: 0, dim: 0, ferie: 0 }]));
+  days.forEach((d) => {
+    const g = gardes?.[d.iso]?.garde;
+    if (!g || !pts[g]) return;
+    const ferie = holidaysSet.has(d.iso);
+    if (ferie) { pts[g].total += 2; pts[g].ferie += 1; }
+    else if (d.isSun) { pts[g].total += 2; pts[g].dim += 1; }
+    else if (d.isSat) { pts[g].total += 1.5; pts[g].sam += 1; }
+    else { pts[g].total += 1; pts[g].sem += 1; }
+  });
+  return pts;
 }
