@@ -228,3 +228,21 @@ a{color:inherit;text-decoration:none}
 @media (max-width:560px){
   .qa-grid{grid-template-columns:1fr}
 }
+
+/* ---------- Hero header (avec image/motif hôpital) ---------- */
+.hero{
+  position:relative;border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem;
+  background:linear-gradient(120deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);
+  box-shadow:var(--shadow-md);isolation:isolate;
+}
+.hero .hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.28;z-index:-2}
+.hero .hero-pattern{position:absolute;inset:0;z-index:-1;opacity:.5}
+.hero .hero-inner{padding:1.9rem 2rem;color:#fff;position:relative;z-index:1}
+.hero h1{font-size:1.7rem;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.hero p{color:#dbeafe;margin-top:.35rem;font-size:.95rem}
+.hero .hero-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.16);
+  padding:.3rem .7rem;border-radius:999px;font-size:.78rem;font-weight:600;margin-bottom:.7rem;backdrop-filter:blur(4px)}
+@media (max-width:900px){
+  .hero .hero-inner{padding:1.4rem 1.25rem}
+  .hero h1{font-size:1.35rem}
+}

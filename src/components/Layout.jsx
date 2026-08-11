@@ -25,8 +25,8 @@ export default function Layout({ children }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="logo">
-          <div className="mark">G</div>
-          <div className="txt">Gardes<small>des Internes</small></div>
+          <div className="mark">✚</div>
+          <div className="txt">Planning<small>Garde</small></div>
         </div>
         <nav className="nav">
           {NAV.map((n) => (
@@ -50,8 +50,8 @@ export default function Layout({ children }) {
 
       <div className="main">
         <div className="mobile-top">
-          <div className="mark">G</div>
-          <div className="brand">Gardes des Internes</div>
+          <div className="mark">✚</div>
+          <div className="brand">Planning Garde</div>
           <button className="btn-icon" onClick={logout} title="Déconnexion">⏻</button>
         </div>
         <div className="content">{children}</div>

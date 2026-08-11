@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePlannings } from '../lib/usePlannings';
 import { isoDate, semesterMonths, monthDays, MONTHS_FR } from '../lib/semester';
 import NewPlanningModal from './NewPlanningModal';
+import Hero from './Hero';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -37,10 +38,11 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>Bonjour {prenom} 👋</h1>
-        <p>Voici un aperçu de tes gardes et plannings.</p>
-      </div>
+      <Hero
+        badge={`${all.length} planning${all.length > 1 ? 's' : ''} accessible${all.length > 1 ? 's' : ''}`}
+        title={`Bonjour ${prenom} 👋`}
+        subtitle="Voici un aperçu de tes gardes et plannings."
+      />
 
       <div className="grid dash">
         {/* Prochaines gardes */}

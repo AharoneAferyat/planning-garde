@@ -66,3 +66,11 @@ src/
     QRCode.jsx                      QR code (api.qrserver.com)
   styles/index.css                  design system
 ```
+
+## Ajouter une vraie photo d'hôpital dans le header (optionnel)
+Le header utilise par défaut un dégradé bleu + motif médical (aucune dépendance,
+ne casse jamais). Si tu veux une **vraie photo** :
+1. Va sur https://unsplash.com, cherche « hospital corridor » (ou autre), ouvre une photo.
+2. Clic droit → « Copier l'adresse de l'image » (URL en `images.unsplash.com/...`).
+3. Ouvre `src/components/Hero.jsx`, colle l'URL dans la constante `HOSPITAL_IMG`.
+   La photo s'affichera derrière le dégradé (opacité réduite pour la lisibilité).
