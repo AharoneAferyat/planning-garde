@@ -12,6 +12,7 @@ import {
   computePresences, gardeConflit, computeStatsProgress, autoDistributeV2, isoDate,
   frenchHolidays, holidayName, computePoints,
 } from '../lib/semester';
+import { useIsMobile } from '../lib/useIsMobile';
 
 const PALETTE = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#0d9488'];
 
@@ -19,12 +20,14 @@ export default function PlanningView() {
   const { id } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [p, setP] = useState(undefined);
   const [membres, setMembres] = useState([]);
   const [histo, setHisto] = useState([]);
   const [tab, setTab] = useState('planning');
   const [gardes, setGardes] = useState({});
   const [presences, setPresences] = useState({});
+  const [planMonthIdx, setPlanMonthIdx] = useState(0);
 
   useEffect(() => watchPlanning(id, setP), [id]);
   useEffect(() => watchMembres(id, setMembres), [id]);
@@ -142,21 +145,37 @@ export default function PlanningView() {
               <div className="spacer" />
               {canEdit && <button className="btn" onClick={runAuto}>⚡ Proposer une répartition</button>}
             </div>
-            <div className="blocks">
-              {months.map((m) => (
-                <PlanningMonth key={`${m.year}-${m.month}`} m={m}
-                  gardes={gardes} presences={presences} internes={interneNames}
-                  interneColor={interneColor} editable={canEdit} onSet={setGarde}
-                  todayIso={todayIso} holidays={holidays} />
-              ))}
-            </div>
+            {isMobile ? (
+              <>
+                <div className="month-nav">
+                  <button className="btn-icon" onClick={() => setPlanMonthIdx(Math.max(0, planMonthIdx - 1))} disabled={planMonthIdx === 0}>‹</button>
+                  <span>{months[planMonthIdx] && `${MONTHS_FR[months[planMonthIdx].month]} ${months[planMonthIdx].year}`}</span>
+                  <button className="btn-icon" onClick={() => setPlanMonthIdx(Math.min(months.length - 1, planMonthIdx + 1))} disabled={planMonthIdx === months.length - 1}>›</button>
+                </div>
+                {months[planMonthIdx] && (
+                  <PlanningMonth m={months[planMonthIdx]}
+                    gardes={gardes} presences={presences} internes={interneNames}
+                    interneColor={interneColor} editable={canEdit} onSet={setGarde}
+                    todayIso={todayIso} holidays={holidays} />
+                )}
+              </>
+            ) : (
+              <div className="blocks">
+                {months.map((m) => (
+                  <PlanningMonth key={`${m.year}-${m.month}`} m={m}
+                    gardes={gardes} presences={presences} internes={interneNames}
+                    interneColor={interneColor} editable={canEdit} onSet={setGarde}
+                    todayIso={todayIso} holidays={holidays} />
+                ))}
+              </div>
+            )}
           </>
         )
       )}
 
       {tab === 'presences' && (
         <PresencesTab months={months} internes={internes} gardes={gardes} presences={presences}
-          editable={canEdit} onSetPresence={setPresence} onSetGarde={setGarde} holidays={holidays} />
+          editable={canEdit} onSetPresence={setPresence} onSetGarde={setGarde} holidays={holidays} isMobile={isMobile} />
       )}
 
       {tab === 'internes' && (
@@ -250,7 +269,7 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
 }
 
 // ---------- Présences ----------
-function PresencesTab({ months, internes, gardes, presences, editable, onSetPresence, onSetGarde, holidays }) {
+function PresencesTab({ months, internes, gardes, presences, editable, onSetPresence, onSetGarde, holidays, isMobile }) {
   const allDays = months.flatMap((m) => m.days);
   const names = internes.map((i) => i.nom);
   const eff = useMemo(() => computePresences(gardes, presences, allDays, names), [gardes, presences, allDays, names]);
@@ -319,6 +338,10 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
             <span className="pl"><span className="sw" style={{ background: '#f1f5f9', color: '#94a3b8' }}>–</span>Vide</span>
           </div>
 
+          {isMobile ? (
+            <PresWeekly m={m} internes={internes} eff={eff} holidays={holidays}
+              editable={editable} openMenu={openMenu} initials={initials} />
+          ) : (
           <div className="pres-wrap">
             <table className="pres-tbl">
               <thead>
@@ -367,6 +390,7 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
               </tbody>
             </table>
           </div>
+          )}
           {editable && <div style={{ marginTop: '.6rem', fontSize: '.76rem', color: 'var(--muted)' }}>
             Clique une case pour définir le statut. « Garde » pose la garde du jour (G) et le repos de sécurité (RS) se met automatiquement le lendemain.
           </div>}
@@ -419,6 +443,63 @@ function SummaryCard({ ic, cls, v, l }) {
     <div className="stat">
       <div className={`ic ${cls}`}>{ic}</div>
       <div><div className="v">{v}</div><div className="l">{l}</div></div>
+    </div>
+  );
+}
+
+// Vue mobile des présences : par semaine, empilée. Aucun scroll horizontal.
+function PresWeekly({ m, internes, eff, holidays, editable, openMenu, initials }) {
+  // découpe les jours du mois en semaines (lundi -> dimanche)
+  const weeks = [];
+  let cur = [];
+  m.days.forEach((d) => {
+    cur.push(d);
+    if (d.weekday === 0) { weeks.push(cur); cur = []; } // dimanche clôt la semaine
+  });
+  if (cur.length) weeks.push(cur);
+
+  return (
+    <div className="pres-weeks">
+      {weeks.map((week, wi) => (
+        <div className="pweek" key={wi}>
+          <div className="pweek-h">
+            Semaine du {String(week[0].day).padStart(2, '0')} au {String(week[week.length - 1].day).padStart(2, '0')} {MONTHS_FR[m.month].slice(0, 4)}.
+          </div>
+          {week.map((d) => {
+            const ferie = holidays.has(d.iso);
+            const dayCls = ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
+            // internes ayant un statut ce jour
+            const withStatus = internes
+              .map((it) => ({ it, code: eff[d.iso]?.[it.nom] || '' }))
+              .filter((x) => x.code);
+            return (
+              <div className={`pday ${dayCls}`} key={d.iso}>
+                <div className="pday-h">
+                  <span className="pday-date">{DAYS_FR[d.weekday]} {String(d.day).padStart(2, '0')}</span>
+                  {ferie && <span className="ferbadge">FÉRIÉ</span>}
+                </div>
+                <div className="pday-chips">
+                  {internes.map((it) => {
+                    const code = eff[d.iso]?.[it.nom] || '';
+                    const st = PRESENCE_MAP[code];
+                    return (
+                      <button key={it.nom}
+                        className={`pchip-m ${editable ? '' : 'ro'}`}
+                        style={code ? { background: st?.color, color: st?.text, borderColor: 'transparent' } : undefined}
+                        onClick={(e) => openMenu(e, d.iso, it.nom)}>
+                        <span className="pchip-ini" style={{ background: code ? 'rgba(255,255,255,.5)' : (it.couleur || '#e2e8f0') }}>
+                          {initials(it.nom)}
+                        </span>
+                        {code || '–'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -107,3 +107,10 @@ ne casse jamais). Si tu veux une **vraie photo** :
 - **Fond photo aléatoire** : le header du tableau de bord charge une photo d'hôpital
   Unsplash différente à chaque ouverture (bouton ⟳ pour changer, crédit photographe,
   fallback dégradé si l'API ne répond pas). Clé Access Unsplash intégrée.
+
+## Mise à jour — responsive mobile complet
+- **Détection automatique** de la taille d'écran (bascule desktop/mobile).
+- **Planning mobile** : un mois à la fois avec sélecteur ‹ mois › (au lieu des 6 mois côte à côte).
+- **Présences mobile** : vue par semaine empilée verticalement, chaque jour affiche les internes
+  en chips cliquables. **Aucun scroll horizontal** — on scrolle seulement vers le bas.
+- Desktop inchangé (grille complète + 6 mois).
