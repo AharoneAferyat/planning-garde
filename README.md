@@ -150,3 +150,21 @@ ne casse jamais). Si tu veux une **vraie photo** :
 > actuelles restent permissives (tout utilisateur connecté peut lire). Pour un verrouillage
 > côté serveur (empêcher un autre compte de lire ces données via l'API), il faudra durcir
 > les règles — à faire dans un second temps.
+
+## Mise à jour — sécurisation des règles Firestore
+Les règles (`FIRESTORE_RULES.txt`) ne sont plus permissives. Désormais :
+- **Plannings** : lisibles seulement par le propriétaire, les membres, ou l'admin.
+  Modifiables par propriétaire/membres (éditeurs) ; supprimables par propriétaire/admin.
+- **Membres** : on ne peut s'ajouter que soi-même (via invitation) ; le propriétaire/admin gère les autres.
+- **Historique** : lisible/écrit par les membres, jamais modifiable après coup.
+- **Invitations** : lisibles par les connectés (pour rejoindre via code), créées par leur auteur.
+- **Événements (journal)** : écrits par les connectés, **lisibles uniquement par l'admin**.
+- **Profils users** : chacun le sien ; l'admin peut tout lire.
+
+### Comment appliquer (0 crédit Netlify — c'est côté Firebase)
+1. Firebase Console → Firestore Database → onglet **Règles**.
+2. Colle tout le contenu de `FIRESTORE_RULES.txt`.
+3. **Publier**. C'est immédiat, aucun rebuild de l'app nécessaire.
+
+> Note : l'admin est identifié par l'email `aaferyat@gmail.com` (en dur dans les règles ET
+> dans le code). Si tu changes d'email admin, il faut le modifier aux deux endroits.
