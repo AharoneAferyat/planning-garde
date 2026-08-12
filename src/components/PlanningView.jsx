@@ -335,7 +335,7 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
                 {s.label}
               </span>
             ))}
-            <span className="pl"><span className="sw" style={{ background: '#f1f5f9', color: '#94a3b8' }}>–</span>Vide</span>
+            <span className="pl"><span className="sw" style={{ background: '#f1f5f9', color: '#94a3b8' }}>–</span>Vide (jour normal)</span>
           </div>
 
           {isMobile ? (
@@ -413,6 +413,7 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
           <div className="pres-menu" style={{ left: menu.x, top: menu.y }}>
             {[
               { code: 'G', label: 'Garde' },
+              { code: 'P', label: 'Présent' },
               { code: 'RS', label: 'Repos sécurité' },
               { code: 'CA', label: 'Congé' },
               { code: 'FCP', label: 'Formation perso' },

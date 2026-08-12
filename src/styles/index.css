@@ -234,15 +234,17 @@ a{color:inherit;text-decoration:none}
   position:relative;border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem;
   background:linear-gradient(120deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);
   box-shadow:var(--shadow-md);isolation:isolate;
+  min-height:150px;display:flex;align-items:center;
 }
-.hero .hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.28;z-index:-2}
+.hero .hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.32;z-index:-2}
 .hero .hero-pattern{position:absolute;inset:0;z-index:-1;opacity:.5}
-.hero .hero-inner{padding:1.9rem 2rem;color:#fff;position:relative;z-index:1}
+.hero .hero-inner{padding:1.5rem 2rem;color:#fff;position:relative;z-index:1;width:100%}
 .hero h1{font-size:1.7rem;font-weight:800;letter-spacing:-.5px;line-height:1.1}
 .hero p{color:#dbeafe;margin-top:.35rem;font-size:.95rem}
 .hero .hero-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.16);
   padding:.3rem .7rem;border-radius:999px;font-size:.78rem;font-weight:600;margin-bottom:.7rem;backdrop-filter:blur(4px)}
 @media (max-width:900px){
+  .hero{min-height:130px}
   .hero .hero-inner{padding:1.4rem 1.25rem}
   .hero h1{font-size:1.35rem}
 }
@@ -322,11 +324,6 @@ a{color:inherit;text-decoration:none}
 .psel.filled{border-style:solid;border-color:transparent;color:#fff}
 .readonly .psel{pointer-events:none}
 
-/* ---------- Hero : bouton refresh + crédit photo ---------- */
-.hero-refresh{position:absolute;top:.7rem;right:.7rem;z-index:2;width:32px;height:32px;border-radius:8px;
-  background:rgba(255,255,255,.18);color:#fff;font-size:1rem;display:flex;align-items:center;justify-content:center;
-  backdrop-filter:blur(4px);transition:.15s}
-.hero-refresh:hover{background:rgba(255,255,255,.3);transform:rotate(90deg)}
 .hero-credit{position:absolute;bottom:.5rem;right:.75rem;z-index:2;font-size:.68rem;color:rgba(255,255,255,.75);
   text-decoration:none}
 .hero-credit:hover{color:#fff;text-decoration:underline}
@@ -362,3 +359,15 @@ a{color:inherit;text-decoration:none}
 .pchip-m.ro{pointer-events:none}
 .pchip-ini{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
   font-size:.6rem;font-weight:800;color:#fff}
+
+/* ---------- Fond de page : photo très estompée ---------- */
+.main{position:relative}
+.page-bg{
+  position:fixed;top:0;left:var(--sidebar-w);right:0;bottom:0;
+  background-size:cover;background-position:center;
+  opacity:.07;z-index:0;pointer-events:none;
+}
+.main .mobile-top,.main .content{position:relative;z-index:1}
+@media (max-width:900px){
+  .page-bg{left:0}
+}

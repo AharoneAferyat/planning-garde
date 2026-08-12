@@ -200,7 +200,7 @@ export function semesterMonthsWithDays(annee, type) {
 //  PRÉSENCES
 // ============================================================
 export const PRESENCE_STATUSES = [
-  { code: 'P', label: 'Présent', color: '#e2e8f0', text: '#334155' },
+  { code: 'P', label: 'Présent', color: '#cffafe', text: '#0e7490' },
   { code: 'G', label: 'Garde', color: '#bfdbfe', text: '#1e40af', auto: true },
   { code: 'RS', label: 'Repos de sécurité', color: '#ddd6fe', text: '#5b21b6', auto: true },
   { code: 'CA', label: 'Congé', color: '#bbf7d0', text: '#166534' },

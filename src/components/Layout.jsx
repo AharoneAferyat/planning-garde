@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { usePhoto } from '../contexts/PhotoContext';
 
 const NAV = [
   { to: '/', label: 'Tableau de bord', ic: '▦', end: true },
@@ -19,6 +20,7 @@ function initials(nom = '') {
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { background } = usePhoto();
   const nav = useNavigate();
 
   return (
@@ -49,6 +51,9 @@ export default function Layout({ children }) {
       </aside>
 
       <div className="main">
+        {background?.url && (
+          <div className="page-bg" style={{ backgroundImage: `url(${background.url})` }} aria-hidden="true" />
+        )}
         <div className="mobile-top">
           <div className="mark">✚</div>
           <div className="brand">Planning Garde</div>

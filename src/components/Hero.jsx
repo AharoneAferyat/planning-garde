@@ -1,39 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { usePhoto } from '../contexts/PhotoContext';
 
-// Clé Unsplash (Access Key — prévue pour un usage côté client).
-const UNSPLASH_ACCESS_KEY = 'UU2P4v_bV_ycZuzUENQiIy092ggSEuOGJ6Ee4kAKW2s';
-// Thèmes piochés au hasard pour varier les photos.
-const QUERIES = ['hospital', 'hospital corridor', 'medical', 'healthcare', 'clinic', 'nurse hospital'];
-
-// En-tête visuel : photo hôpital aléatoire (Unsplash) derrière un dégradé + motif médical.
-// Fallback propre sur le dégradé seul si l'API ne répond pas.
+// En-tête visuel : photo hôpital (header) + dégradé + motif médical.
 export default function Hero({ badge, title, subtitle, children }) {
-  const [photo, setPhoto] = useState(null); // { url, author, authorLink, link }
-
-  const fetchPhoto = useCallback(async () => {
-    if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY.startsWith('VOTRE_')) return;
-    const q = QUERIES[Math.floor(Math.random() * QUERIES.length)];
-    try {
-      const res = await fetch(
-        `https://api.unsplash.com/photos/random?query=${encodeURIComponent(q)}&orientation=landscape&content_filter=high`,
-        { headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` } }
-      );
-      if (!res.ok) return; // 403/limite → on garde le dégradé seul
-      const d = await res.json();
-      setPhoto({
-        url: d.urls?.regular,
-        author: d.user?.name,
-        authorLink: d.user?.links?.html,
-        link: d.links?.html,
-      });
-    } catch { /* réseau : fallback dégradé */ }
-  }, []);
-
-  useEffect(() => { fetchPhoto(); }, [fetchPhoto]);
-
+  const { header } = usePhoto();
   return (
     <div className="hero">
-      {photo?.url && <div className="hero-img" style={{ backgroundImage: `url(${photo.url})` }} />}
+      {header?.url && <div className="hero-img" style={{ backgroundImage: `url(${header.url})` }} />}
       <div className="hero-pattern">
         <svg width="100%" height="100%" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 200">
           <defs>
@@ -52,10 +24,9 @@ export default function Hero({ badge, title, subtitle, children }) {
         {subtitle && <p>{subtitle}</p>}
         {children}
       </div>
-      <button className="hero-refresh" title="Changer la photo" onClick={fetchPhoto}>⟳</button>
-      {photo?.author && (
-        <a className="hero-credit" href={photo.link} target="_blank" rel="noreferrer">
-          Photo : {photo.author} / Unsplash
+      {header?.author && (
+        <a className="hero-credit" href={header.link} target="_blank" rel="noreferrer">
+          Photo : {header.author} / Unsplash
         </a>
       )}
     </div>

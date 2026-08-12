@@ -114,3 +114,16 @@ ne casse jamais). Si tu veux une **vraie photo** :
 - **Présences mobile** : vue par semaine empilée verticalement, chaque jour affiche les internes
   en chips cliquables. **Aucun scroll horizontal** — on scrolle seulement vers le bas.
 - Desktop inchangé (grille complète + 6 mois).
+
+## Mise à jour — header cadré + fond de page estompé
+- **Header** à hauteur fixe (150px) avec la photo Unsplash **bien cadrée** (cover centré), plus déformée.
+- **Fond de page** : la même photo aléatoire en **très estompé (7%)** derrière le contenu,
+  pour casser le blanc sans gêner la lecture. Header et fond partagent la même image
+  (cohérence visuelle) et changent ensemble à chaque ouverture / via le bouton ⟳.
+
+## Mise à jour — 2 images distinctes + plafond horaire
+- **Deux photos différentes** : une pour le header, une autre pour le fond de page (plus la même).
+- **Plus de bouton refresh** : les images changent uniquement à l'ouverture / actualisation de la page.
+- **Plafond de 5 changements par heure** : au-delà (rechargements fréquents), les images restent
+  figées jusqu'à ce que l'heure tourne. Mémorisé dans le navigateur (localStorage), ce qui économise
+  aussi le quota Unsplash.
