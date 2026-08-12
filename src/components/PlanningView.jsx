@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  watchPlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences,
+  watchPlanning, updatePlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences,
   watchMembres, watchHistorique, logAction, updateMembreRole, removeMembre,
 } from '../lib/firebase';
 import {
@@ -28,11 +28,15 @@ export default function PlanningView() {
   const [gardes, setGardes] = useState({});
   const [presences, setPresences] = useState({});
   const [planMonthIdx, setPlanMonthIdx] = useState(0);
+  const [changed, setChanged] = useState({});      // { iso: true } cases "modifiées" (jaune)
+  const [wasRandom, setWasRandom] = useState(false);
+  const [editsSinceRandom, setEditsSinceRandom] = useState(0);
 
   useEffect(() => watchPlanning(id, setP), [id]);
   useEffect(() => watchMembres(id, setMembres), [id]);
   useEffect(() => watchHistorique(id, setHisto), [id]);
   useEffect(() => { if (p) { setGardes(p.gardes || {}); setPresences(p.presences || {}); } }, [p?.gardes, p?.presences]);
+  useEffect(() => { if (p) { setChanged(p.changed || {}); setWasRandom(!!p.wasRandom); setEditsSinceRandom(p.editsSinceRandom || 0); } }, [p?.changed, p?.wasRandom, p?.editsSinceRandom]);
 
   const myMembre = membres.find((m) => m.email === user?.email);
   const myRole = myMembre?.role || (p?.ownerEmail === user?.email ? 'proprietaire' : null);
@@ -65,13 +69,30 @@ export default function PlanningView() {
   const interneNames = internes.map((i) => i.nom);
   const todayIso = isoDate(new Date());
 
+  // Marque une case comme "modifiée" (jaune) selon la règle :
+  // - planning random : 1re modif ne marque pas, 2e+ marque. (editsSinceRandom)
+  // - planning manuel (jamais de random) : 1re modif marque déjà.
+  const applyChangeMark = (iso, nextGardes, extra = {}) => {
+    let nextChanged = { ...changed };
+    let nextEdits = editsSinceRandom;
+    if (wasRandom) {
+      nextEdits = editsSinceRandom + 1;
+      if (nextEdits >= 2) nextChanged[iso] = true; // à partir de la 2e modif
+    } else {
+      nextChanged[iso] = true; // planning manuel : dès la 1re
+    }
+    setChanged(nextChanged);
+    setEditsSinceRandom(nextEdits);
+    updatePlanning(id, { gardes: nextGardes, changed: nextChanged, editsSinceRandom: nextEdits, ...extra });
+  };
+
   const setGarde = async (iso, garde, dateLabel) => {
     const next = { ...gardes };
     if (garde) next[iso] = { ...(next[iso] || {}), garde };
     else { if (next[iso]) { const c = { ...next[iso] }; delete c.garde; next[iso] = c; if (!next[iso].garde) delete next[iso]; } }
     setGardes(next);
     try {
-      await updatePlanningGardes(id, next);
+      applyChangeMark(iso, next);
       logAction(id, user, 'garde', `${dateLabel} → ${garde || '—'}`);
     } catch {}
   };
@@ -82,7 +103,14 @@ export default function PlanningView() {
     if (code) row[nom] = code; else delete row[nom];
     if (Object.keys(row).length) next[iso] = row; else delete next[iso];
     setPresences(next);
-    try { await updatePlanningPresences(id, next); } catch {}
+    try {
+      let nextChanged = { ...changed };
+      let nextEdits = editsSinceRandom;
+      if (wasRandom) { nextEdits = editsSinceRandom + 1; if (nextEdits >= 2) nextChanged[iso] = true; }
+      else { nextChanged[iso] = true; }
+      setChanged(nextChanged); setEditsSinceRandom(nextEdits);
+      updatePlanning(id, { presences: next, changed: nextChanged, editsSinceRandom: nextEdits });
+    } catch {}
   };
 
   // ---- Internes CRUD ----
@@ -110,7 +138,11 @@ export default function PlanningView() {
     const next = {};
     Object.entries(dist).forEach(([iso, nom]) => { next[iso] = { ...(gardes[iso] || {}), garde: nom }; });
     setGardes(next);
-    try { await updatePlanningGardes(id, next); logAction(id, user, 'auto', 'Répartition automatique générée'); } catch {}
+    setChanged({}); setWasRandom(true); setEditsSinceRandom(0);
+    try {
+      updatePlanning(id, { gardes: next, changed: {}, wasRandom: true, editsSinceRandom: 0 });
+      logAction(id, user, 'auto', 'Répartition automatique générée');
+    } catch {}
   };
 
   return (
@@ -156,7 +188,7 @@ export default function PlanningView() {
                   <PlanningMonth m={months[planMonthIdx]}
                     gardes={gardes} presences={presences} internes={interneNames}
                     interneColor={interneColor} editable={canEdit} onSet={setGarde}
-                    todayIso={todayIso} holidays={holidays} />
+                    todayIso={todayIso} holidays={holidays} changed={changed} />
                 )}
               </>
             ) : (
@@ -165,7 +197,7 @@ export default function PlanningView() {
                   <PlanningMonth key={`${m.year}-${m.month}`} m={m}
                     gardes={gardes} presences={presences} internes={interneNames}
                     interneColor={interneColor} editable={canEdit} onSet={setGarde}
-                    todayIso={todayIso} holidays={holidays} />
+                    todayIso={todayIso} holidays={holidays} changed={changed} />
                 ))}
               </div>
             )}
@@ -175,7 +207,7 @@ export default function PlanningView() {
 
       {tab === 'presences' && (
         <PresencesTab months={months} internes={internes} gardes={gardes} presences={presences}
-          editable={canEdit} onSetPresence={setPresence} onSetGarde={setGarde} holidays={holidays} isMobile={isMobile} />
+          editable={canEdit} onSetPresence={setPresence} onSetGarde={setGarde} holidays={holidays} isMobile={isMobile} changed={changed} />
       )}
 
       {tab === 'internes' && (
@@ -213,7 +245,7 @@ export default function PlanningView() {
 }
 
 // ---------- Planning mois V1 : tableau dense ----------
-function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso, holidays }) {
+function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso, holidays, changed = {} }) {
   const days = m.days;
   const byIso = {}; days.forEach((d) => { byIso[d.iso] = d; });
   return (
@@ -234,11 +266,12 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
             const ferie = holidays.has(d.iso);
             const val = ferie || d.isSun ? '2×' : d.isSat ? '1,5×' : '1×';
             const rc = conflit ? 'conflit' : ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
+            const isChanged = !!changed[d.iso];
             const bad = doublon || conflit;
             const col = interneColor[garde];
             const dl = `${DAYS_FR[d.weekday]} ${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}`;
             return (
-              <tr key={d.iso} className={rc}>
+              <tr key={d.iso} className={`${rc} ${isChanged ? 'changed' : ''}`}>
                 <td className="pdd">
                   {DAYS_FR[d.weekday]} <b>{String(d.day).padStart(2, '0')}/{String(d.month).padStart(2, '0')}</b>
                   {ferie && <span className="ferbadge" title={holidayName(d.iso)}>FÉRIÉ</span>}
@@ -269,7 +302,7 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
 }
 
 // ---------- Présences ----------
-function PresencesTab({ months, internes, gardes, presences, editable, onSetPresence, onSetGarde, holidays, isMobile }) {
+function PresencesTab({ months, internes, gardes, presences, editable, onSetPresence, onSetGarde, holidays, isMobile, changed = {} }) {
   const allDays = months.flatMap((m) => m.days);
   const names = internes.map((i) => i.nom);
   const eff = useMemo(() => computePresences(gardes, presences, allDays, names), [gardes, presences, allDays, names]);
@@ -376,7 +409,7 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
                       const wecls = ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
                       return (
                         <td key={d.iso}
-                          className={`pres-cell ${editable ? '' : 'readonly'} ${!code ? wecls : ''}`}
+                          className={`pres-cell ${editable ? '' : 'readonly'} ${!code ? wecls : ''} ${changed[d.iso] ? 'cell-changed' : ''}`}
                           style={code ? { background: st?.color, color: st?.text } : undefined}
                           title={st ? st.label : ''}
                           onClick={(e) => openMenu(e, d.iso, it.nom)}>

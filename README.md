@@ -127,3 +127,12 @@ ne casse jamais). Si tu veux une **vraie photo** :
 - **Plafond de 5 changements par heure** : au-delà (rechargements fréquents), les images restent
   figées jusqu'à ce que l'heure tourne. Mémorisé dans le navigateur (localStorage), ce qui économise
   aussi le quota Unsplash.
+
+## Mise à jour — équité, visuel présences, indicateur modifié
+- **Répartition auto vraiment équitable** : équilibre séparément samedis, dimanches, fériés
+  (chaque catégorie répartie le plus également possible entre tous), puis points et nb de gardes.
+- **FCP / FCC** : pastilles élargies, les libellés ne débordent plus (légende, cases, menu).
+- **Samedi / dimanche / férié distinctifs** dans la grille présences : cases vides en motif rayé
+  (on n'est pas présent par défaut le WE) ; un statut posé reprend sa couleur pleine.
+- **Indicateur « modifié » (jaune)** : après un random, la 1re modif ne marque pas, la 2e+ oui ;
+  un planning fait à la main marque dès la 1re modif ; un nouveau random remet à zéro.

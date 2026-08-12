@@ -447,52 +447,93 @@ export function autoDistributeV2(days, internes, opts = {}) {
   const maxMois = Object.fromEntries(internes.map((i) => [i.nom, i.maxMois ?? maxMoisDefault]));
   const maxSem = Object.fromEntries(internes.map((i) => [i.nom, i.maxSem ?? maxSemDefault]));
 
-  const cntSem = Object.fromEntries(names.map((n) => [n, 0]));
-  const pts = Object.fromEntries(names.map((n) => [n, 0]));
-  const heavy = Object.fromEntries(names.map((n) => [n, 0])); // WE + fériés
+  // compteurs par personne
+  const cntSem = Object.fromEntries(names.map((n) => [n, 0]));   // total gardes
+  const pts = Object.fromEntries(names.map((n) => [n, 0]));      // points
+  const cat = Object.fromEntries(names.map((n) => [n, { ferie: 0, dim: 0, sam: 0 }])); // par catégorie
   const cntMois = {};
   const result = {};
-  let prev = null;
+  const assignedBy = {}; // iso -> nom (pour recalcul V+D)
   const monthKey = (d, n) => `${n}-${d.year}-${d.month}`;
 
-  days.forEach((d) => {
-    const ferie = holidays.has(d.iso);
-    const val = d.isSun || ferie ? 2 : d.isSat ? 1.5 : 1;
-    const isHeavy = d.isWeekend || ferie;
+  // classe chaque jour par "préciosité" : férié > dimanche > samedi > semaine.
+  // On attribue les jours les plus précieux EN PREMIER pour garantir leur équité,
+  // et à l'intérieur d'une catégorie on répartit également.
+  const rank = (d) => {
+    if (holidays.has(d.iso)) return 0; // férié = le plus précieux
+    if (d.isSun) return 1;
+    if (d.isSat) return 2;
+    return 3; // semaine
+  };
+  const catKey = (d) => {
+    if (holidays.has(d.iso)) return 'ferie';
+    if (d.isSun) return 'dim';
+    if (d.isSat) return 'sam';
+    return null;
+  };
 
-    let cands = names.filter((n) => {
-      if (n === prev) return false;
-      if (cntSem[n] >= maxSem[n]) return false;
-      if ((cntMois[monthKey(d, n)] || 0) >= maxMois[n]) return false;
-      if (ABSENT_CODES.includes(presences?.[d.iso]?.[n])) return false;
-      return true;
+  // on garde l'ordre chronologique dans chaque groupe (pour la règle "pas 2 de suite")
+  const groups = [[], [], [], []];
+  days.forEach((d) => groups[rank(d)].push(d));
+
+  const isAdjacent = (iso, nom) => {
+    // interdit d'être de garde 2 jours consécutifs
+    const prev = shiftIso(iso, -1);
+    const next = shiftIso(iso, 1);
+    return assignedBy[prev] === nom || assignedBy[next] === nom;
+  };
+
+  const assignGroup = (group) => {
+    group.forEach((d) => {
+      const val = holidays.has(d.iso) || d.isSun ? 2 : d.isSat ? 1.5 : 1;
+      const ck = catKey(d);
+
+      let cands = names.filter((n) => {
+        if (isAdjacent(d.iso, n)) return false;
+        if (cntSem[n] >= maxSem[n]) return false;
+        if ((cntMois[monthKey(d, n)] || 0) >= maxMois[n]) return false;
+        if (ABSENT_CODES.includes(presences?.[d.iso]?.[n])) return false;
+        return true;
+      });
+      if (cands.length === 0) cands = names.filter((n) => !isAdjacent(d.iso, n) && cntSem[n] < maxSem[n]);
+      if (cands.length === 0) cands = names.filter((n) => !isAdjacent(d.iso, n));
+      if (cands.length === 0) return;
+
+      // Priorité : équilibrer d'abord la CATÉGORIE du jour (fériés entre eux,
+      // dimanches entre eux, etc.), puis les points, puis le nb total de gardes.
+      cands.sort((a, b) => {
+        if (ck) { const dc = cat[a][ck] - cat[b][ck]; if (dc !== 0) return dc; }
+        const dp = pts[a] - pts[b]; if (Math.abs(dp) > 0.01) return dp;
+        const dg = cntSem[a] - cntSem[b]; if (dg !== 0) return dg;
+        return rnd() - 0.5;
+      });
+      // un peu d'aléatoire parmi les ex-æquo du meilleur score
+      const best = cands[0];
+      const bestScore = ck ? cat[best][ck] : cntSem[best];
+      const tied = cands.filter((n) => (ck ? cat[n][ck] : cntSem[n]) === bestScore);
+      const pick = tied[Math.floor(rnd() * tied.length)];
+
+      result[d.iso] = pick;
+      assignedBy[d.iso] = pick;
+      cntSem[pick] += 1;
+      pts[pick] += val;
+      if (ck) cat[pick][ck] += 1;
+      cntMois[monthKey(d, pick)] = (cntMois[monthKey(d, pick)] || 0) + 1;
     });
-    if (cands.length === 0) cands = names.filter((n) => n !== prev && cntSem[n] < maxSem[n]);
-    if (cands.length === 0) cands = names.filter((n) => n !== prev);
-    if (cands.length === 0) { prev = null; return; }
+  };
 
-    // score composite : on privilégie qui a le moins de points, puis le moins
-    // de jours "lourds" (si le jour est lourd), puis le moins de gardes.
-    cands.sort((a, b) => {
-      const dp = pts[a] - pts[b];
-      if (Math.abs(dp) > 0.01) return dp;
-      if (isHeavy) { const dh = heavy[a] - heavy[b]; if (dh !== 0) return dh; }
-      const dg = cntSem[a] - cntSem[b];
-      if (dg !== 0) return dg;
-      return rnd() - 0.5;
-    });
-    const pool = cands.slice(0, Math.min(2, cands.length));
-    const pick = pool[Math.floor(rnd() * pool.length)];
-
-    result[d.iso] = pick;
-    cntSem[pick] += 1;
-    pts[pick] += val;
-    if (isHeavy) heavy[pick] += 1;
-    cntMois[monthKey(d, pick)] = (cntMois[monthKey(d, pick)] || 0) + 1;
-    prev = pick;
-  });
+  // Ordre : fériés, dimanches, samedis, puis semaine.
+  groups.forEach(assignGroup);
 
   return result;
+}
+
+// décale un ISO de n jours
+function shiftIso(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + n);
+  return isoDate(dt);
 }
 
 // Stats de points par interne (pour affichage).
