@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  watchPlanning, updatePlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences,
+  watchPlanning, updatePlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences, claimInterne,
   watchMembres, watchHistorique, logAction, updateMembreRole, removeMembre,
 } from '../lib/firebase';
 import {
@@ -128,6 +128,19 @@ export default function PlanningView() {
     logAction(id, user, 'interne', `Suppression ${it.nom}`);
   };
 
+  // "C'est moi" : le membre courant se relie à cet interne (+ option renommer avec prénom)
+  const claimMe = async (idx) => {
+    const it = internes[idx];
+    const prenom = prompt(`Ton prénom (remplacera « ${it.nom} ») :`, (user?.nom || '').split(' ')[0] || it.nom);
+    if (prenom === null) return; // annulé
+    await claimInterne(id, idx, prenom.trim() || it.nom, user.email);
+    logAction(id, user, 'interne', `${user.nom} s'est identifié comme ${prenom.trim() || it.nom}`);
+  };
+  const unclaimMe = async (idx) => {
+    const next = internes.map((x, i) => i === idx ? { ...x, email: '' } : x);
+    updatePlanningInternes(id, next);
+  };
+
   // ---- Répartition auto ----
   const runAuto = async () => {
     if (!canEdit) return;
@@ -218,18 +231,33 @@ export default function PlanningView() {
           <div className="card-b" style={{ padding: 0 }}>
             <div className="tbl-scroll">
               <table className="tbl">
-                <thead><tr><th>Nom</th><th>Couleur</th><th>Max/mois</th><th>Max/sem.</th>{canEdit && <th></th>}</tr></thead>
+                <thead><tr><th>Nom</th><th>Couleur</th><th>Max/mois</th><th>Max/sem.</th><th>Identité</th>{canEdit && <th></th>}</tr></thead>
                 <tbody>
-                  {internes.length === 0 && <tr><td colSpan={5}><div className="empty">Aucun interne.</div></td></tr>}
-                  {internes.map((it, idx) => (
+                  {internes.length === 0 && <tr><td colSpan={6}><div className="empty">Aucun interne.</div></td></tr>}
+                  {internes.map((it, idx) => {
+                    const isMe = it.email === user?.email;
+                    return (
                     <tr key={idx}>
                       <td><input type="text" value={it.nom} disabled={!canEdit} onChange={(e) => patchInterne(idx, 'nom', e.target.value)} /></td>
                       <td><input type="color" className="swatch" value={it.couleur || '#e2e8f0'} disabled={!canEdit} style={{ width: 32, height: 28, padding: 0 }} onChange={(e) => patchInterne(idx, 'couleur', e.target.value)} /></td>
                       <td><input type="number" value={it.maxMois ?? 5} disabled={!canEdit} onChange={(e) => patchInterne(idx, 'maxMois', Number(e.target.value))} /></td>
                       <td><input type="number" value={it.maxSem ?? 25} disabled={!canEdit} onChange={(e) => patchInterne(idx, 'maxSem', Number(e.target.value))} /></td>
+                      <td>
+                        {isMe ? (
+                          <span className="row" style={{ gap: '.4rem' }}>
+                            <span className="badge green">★ C'est moi</span>
+                            <button className="btn ghost sm" onClick={() => unclaimMe(idx)}>Retirer</button>
+                          </span>
+                        ) : it.email ? (
+                          <span className="badge gray" title={it.email}>Pris</span>
+                        ) : (
+                          <button className="btn secondary sm" onClick={() => claimMe(idx)}>C'est moi</button>
+                        )}
+                      </td>
                       {canEdit && <td><button className="btn danger sm" onClick={() => delInterne(idx)}>Suppr.</button></td>}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

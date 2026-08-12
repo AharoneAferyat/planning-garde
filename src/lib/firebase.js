@@ -160,5 +160,39 @@ export const joinViaCode = async (code, user) => {
   await updateDoc(doc(db, 'invitations', inv.code), {
     usedBy: [...(inv.usedBy || []), { email: user.email, at: Date.now() }],
   });
-  return { ok: true, planningId: inv.planningId, role: inv.role };
+  return { ok: true, planningId: inv.planningId, planningNom: inv.planningNom, role: inv.role };
+};
+
+// ============ ADMIN : journal global d'événements ============
+// events/{auto} => { type:'login'|'join'|'create_planning'|'create_invitation', email, nom, detail, at }
+export const ADMIN_EMAIL = 'aaferyat@gmail.com';
+export const isAdmin = (u) => u?.email === ADMIN_EMAIL;
+
+export const logEvent = (type, user, detail = '') =>
+  addDoc(collection(db, 'events'), {
+    type, email: user?.email || '?', nom: user?.nom || user?.email || '?',
+    detail, at: Date.now(),
+  });
+
+export const watchEvents = (cb, n = 200) =>
+  onSnapshot(
+    query(collection(db, 'events'), orderBy('at', 'desc'), limit(n)),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  );
+
+// Récupère TOUT (admin only) : tous les plannings, toutes les invitations, tous les membres.
+export const adminFetchAll = async () => {
+  const [plansSnap, invSnap, memSnap, usersSnap] = await Promise.all([
+    getDocs(collection(db, 'plannings')),
+    getDocs(collection(db, 'invitations')),
+    getDocs(collectionGroup(db, 'membres')),
+    getDocs(collection(db, 'users')),
+  ]);
+  const plannings = plansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const invitations = invSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const membres = memSnap.docs.map((d) => ({
+    planningId: d.ref.parent.parent.id, ...d.data(),
+  }));
+  const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return { plannings, invitations, membres, users };
 };

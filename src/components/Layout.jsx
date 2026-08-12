@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePhoto } from '../contexts/PhotoContext';
+import { isAdmin } from '../lib/firebase';
 
 const NAV = [
   { to: '/', label: 'Tableau de bord', ic: '▦', end: true },
@@ -37,6 +38,13 @@ export default function Layout({ children }) {
               <span className="ic">{n.ic}</span> {n.label}
             </NavLink>
           ))}
+          {isAdmin(user) && (
+            <NavLink to="/admin"
+              className={({ isActive }) => isActive ? 'active' : ''}
+              style={{ marginTop: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
+              <span className="ic">⚙</span> Administration
+            </NavLink>
+          )}
         </nav>
         <div className="foot">
           <div className="avatar">

@@ -136,3 +136,17 @@ ne casse jamais). Si tu veux une **vraie photo** :
   (on n'est pas présent par défaut le WE) ; un statut posé reprend sa couleur pleine.
 - **Indicateur « modifié » (jaune)** : après un random, la 1re modif ne marque pas, la 2e+ oui ;
   un planning fait à la main marque dès la 1re modif ; un nouveau random remet à zéro.
+
+## Mise à jour — "C'est moi" pour tous + page Admin
+- **S'identifier comme interne** : dans l'onglet Internes, chaque membre (propriétaire inclus)
+  peut cliquer « C'est moi » sur une ligne, mettre son prénom → l'interne est renommé et lié
+  à son compte. Le dashboard « prochaine garde » repère alors ses gardes (★).
+- **Page Administration** (réservée à aaferyat@gmail.com) : vue globale sur tous les plannings,
+  toutes les invitations, tous les utilisateurs, et un **journal d'activité** (connexions,
+  créations de planning, créations d'invitation, personnes ayant rejoint via un code).
+  Les connexions sont enregistrées à partir de ce déploiement.
+
+> ⚠️ Sécurité : l'accès admin est vérifié côté application (email). Les règles Firestore
+> actuelles restent permissives (tout utilisateur connecté peut lire). Pour un verrouillage
+> côté serveur (empêcher un autre compte de lire ces données via l'API), il faudra durcir
+> les règles — à faire dans un second temps.

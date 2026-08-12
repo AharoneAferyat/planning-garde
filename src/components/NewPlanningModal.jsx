@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { createPlanning, addMembre } from '../lib/firebase';
+import { createPlanning, addMembre, logEvent } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
 export default function NewPlanningModal({ onClose, onCreated }) {
@@ -22,6 +22,7 @@ export default function NewPlanningModal({ onClose, onCreated }) {
     }, user);
     // Le créateur devient propriétaire (membre)
     await addMembre(ref.id, user.email, user.nom, 'proprietaire');
+    logEvent('create_planning', user, `A créé le planning « ${label} »`);
     setBusy(false);
     onCreated(ref.id);
   };

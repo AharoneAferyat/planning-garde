@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { watchAuth, upsertUser, loginGoogle, logout } from '../lib/firebase';
+import { watchAuth, upsertUser, loginGoogle, logout, logEvent } from '../lib/firebase';
 
 const AuthContext = createContext(null);
 
@@ -18,6 +18,14 @@ export function AuthProvider({ children }) {
         };
         setUser(profile);
         try { await upsertUser(u); } catch { /* offline ok */ }
+        // journal des connexions : une fois par session navigateur
+        try {
+          const key = `pg_login_${u.email}`;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            logEvent('login', profile, 'Connexion');
+          }
+        } catch { /* ignore */ }
       } else {
         setUser(null);
       }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlannings } from '../lib/usePlannings';
-import { createInvitation, watchInvitations, deleteInvitation } from '../lib/firebase';
+import { createInvitation, watchInvitations, deleteInvitation, logEvent } from '../lib/firebase';
 import QRCode from './QRCode';
 
 export default function Invitations() {
@@ -30,6 +30,7 @@ export default function Invitations() {
   const generate = async () => {
     if (!planning) return;
     const code = await createInvitation(planning.id, planning.nom, role, user);
+    logEvent("create_invitation", user, `A créé une invitation (${role}) pour « ${planning.nom} » : ${code}`);
     setLastCode(code);
   };
 
