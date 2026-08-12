@@ -181,3 +181,11 @@ Les règles (`FIRESTORE_RULES.txt`) ne sont plus permissives. Désormais :
 ### Règles Firestore : à republier
 Ce lot ajoute une règle collectionGroup pour `historique` (vue globale admin).
 Republie `FIRESTORE_RULES.txt` dans Firebase (0 crédit) en plus du déploiement de l'app.
+
+## Mise à jour — suppression des logs + séparation connexions/actions
+- **Onglets séparés** dans l'admin : **Connexions** (les logins seuls) et **Actions**
+  (créations, suppressions, rôles, joins…).
+- **Suppression des logs** : croix ✕ par ligne + bouton « Vider » — sur Connexions, Actions,
+  et Modifs plannings (+ suppression dans le détail par planning).
+- **Règles Firestore** : l'admin peut désormais supprimer les événements et les entrées
+  d'historique (les autres utilisateurs ne peuvent toujours pas). À republier.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique } from '../lib/firebase';
+import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
 export default function AdminPage() {
@@ -9,7 +9,7 @@ export default function AdminPage() {
   const [events, setEvents] = useState([]);
   const [allHisto, setAllHisto] = useState(null);   // vue globale des modifs
   const [detail, setDetail] = useState(null);       // { planning, histo } détail d'un planning
-  const [tab, setTab] = useState('events');
+  const [tab, setTab] = useState('connexions');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,57 +60,111 @@ export default function AdminPage() {
       </div>
 
       <div className="tabs">
-        {['events', 'modifs', 'plannings', 'invitations', 'users'].map((t) => (
+        {['connexions', 'actions', 'modifs', 'plannings', 'invitations', 'users'].map((t) => (
           <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {{ events: 'Journal global', modifs: 'Modifs plannings', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs' }[t]}
+            {{ connexions: 'Connexions', actions: 'Actions', modifs: 'Modifs plannings', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs' }[t]}
           </div>
         ))}
       </div>
 
-      {loading && tab !== 'events' ? (
+      {loading && tab !== 'connexions' && tab !== 'actions' ? (
         <div className="loading-screen" style={{ minHeight: 160 }}><div className="spinner" /></div>
       ) : (
         <div className="card">
           <div className="card-b" style={{ padding: 0 }}>
-            {tab === 'events' && (
-              <table className="tbl">
-                <thead><tr><th>Type</th><th>Qui</th><th>Détail</th><th>Quand</th></tr></thead>
-                <tbody>
-                  {events.length === 0 && <tr><td colSpan={4}><div className="empty">Aucun événement enregistré pour l'instant.</div></td></tr>}
-                  {events.map((e) => (
-                    <tr key={e.id}>
-                      <td><span className={`badge ${eventColor(e.type)}`}>{eventLabel(e.type)}</span></td>
-                      <td><div style={{ fontWeight: 600 }}>{e.nom}</div><div style={{ fontSize: '.76rem', color: 'var(--muted)' }}>{e.email}</div></td>
-                      <td style={{ color: 'var(--muted)' }}>{e.detail}</td>
-                      <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(e.at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {tab === 'connexions' && (() => {
+              const rows = events.filter((e) => e.type === 'login');
+              return (
+                <>
+                  <div className="row" style={{ justifyContent: 'flex-end', padding: '.7rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                    <button className="btn danger sm" disabled={rows.length === 0}
+                      onClick={() => { if (confirm('Vider tous les logs de connexion ?')) clearEvents(rows.map((r) => r.id)); }}>
+                      Vider les connexions
+                    </button>
+                  </div>
+                  <table className="tbl">
+                    <thead><tr><th>Qui</th><th>Email</th><th>Quand</th><th></th></tr></thead>
+                    <tbody>
+                      {rows.length === 0 && <tr><td colSpan={4}><div className="empty">Aucune connexion enregistrée.</div></td></tr>}
+                      {rows.map((e) => (
+                        <tr key={e.id}>
+                          <td style={{ fontWeight: 600 }}>{e.nom}</td>
+                          <td style={{ color: 'var(--muted)' }}>{e.email}</td>
+                          <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(e.at)}</td>
+                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}>✕</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              );
+            })()}
+
+            {tab === 'actions' && (() => {
+              const rows = events.filter((e) => e.type !== 'login');
+              return (
+                <>
+                  <div className="row" style={{ justifyContent: 'flex-end', padding: '.7rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                    <button className="btn danger sm" disabled={rows.length === 0}
+                      onClick={() => { if (confirm('Vider tous les logs d\'action ?')) clearEvents(rows.map((r) => r.id)); }}>
+                      Vider les actions
+                    </button>
+                  </div>
+                  <table className="tbl">
+                    <thead><tr><th>Type</th><th>Qui</th><th>Détail</th><th>Quand</th><th></th></tr></thead>
+                    <tbody>
+                      {rows.length === 0 && <tr><td colSpan={5}><div className="empty">Aucune action enregistrée.</div></td></tr>}
+                      {rows.map((e) => (
+                        <tr key={e.id}>
+                          <td><span className={`badge ${eventColor(e.type)}`}>{eventLabel(e.type)}</span></td>
+                          <td><div style={{ fontWeight: 600 }}>{e.nom}</div><div style={{ fontSize: '.76rem', color: 'var(--muted)' }}>{e.email}</div></td>
+                          <td style={{ color: 'var(--muted)' }}>{e.detail}</td>
+                          <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(e.at)}</td>
+                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}>✕</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              );
+            })()}
 
             {tab === 'modifs' && (
               allHisto === null ? (
                 <div className="loading-screen" style={{ minHeight: 140 }}><div className="spinner" /></div>
               ) : (
-                <table className="tbl">
-                  <thead><tr><th>Planning</th><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th></tr></thead>
-                  <tbody>
-                    {allHisto.length === 0 && <tr><td colSpan={5}><div className="empty">Aucune modification enregistrée.</div></td></tr>}
-                    {allHisto.map((h) => {
-                      const pl = data?.plannings.find((p) => p.id === h.planningId);
-                      return (
-                        <tr key={h.id}>
-                          <td style={{ fontWeight: 600 }}>{pl ? (pl.nom || semesterLabel(pl.annee, pl.type)) : h.planningId?.slice(0, 6)}</td>
-                          <td>{h.nom}</td>
-                          <td><span className="badge gray">{h.action}</span></td>
-                          <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
-                          <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <>
+                  <div className="row" style={{ justifyContent: 'flex-end', padding: '.7rem 1rem', borderBottom: '1px solid var(--line)' }}>
+                    <button className="btn danger sm" disabled={allHisto.length === 0}
+                      onClick={async () => {
+                        if (!confirm('Vider TOUTES les modifs de TOUS les plannings ? (irréversible)')) return;
+                        await clearHistorique(allHisto.map((h) => ({ planningId: h.planningId, id: h.id })));
+                        setAllHisto([]);
+                      }}>
+                      Tout vider
+                    </button>
+                  </div>
+                  <table className="tbl">
+                    <thead><tr><th>Planning</th><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th><th></th></tr></thead>
+                    <tbody>
+                      {allHisto.length === 0 && <tr><td colSpan={6}><div className="empty">Aucune modification enregistrée.</div></td></tr>}
+                      {allHisto.map((h) => {
+                        const pl = data?.plannings.find((p) => p.id === h.planningId);
+                        return (
+                          <tr key={h.id}>
+                            <td style={{ fontWeight: 600 }}>{pl ? (pl.nom || semesterLabel(pl.annee, pl.type)) : h.planningId?.slice(0, 6)}</td>
+                            <td>{h.nom}</td>
+                            <td><span className="badge gray">{h.action}</span></td>
+                            <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
+                            <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
+                            <td><button className="btn-icon" title="Supprimer"
+                              onClick={async () => { await deleteHistorique(h.planningId, h.id); setAllHisto((prev) => prev.filter((x) => x.id !== h.id)); }}>✕</button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
               )
             )}
 
@@ -185,7 +239,7 @@ export default function AdminPage() {
                 <div className="empty">Aucune modification sur ce planning.</div>
               ) : (
                 <table className="tbl">
-                  <thead><tr><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th></tr></thead>
+                  <thead><tr><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th><th></th></tr></thead>
                   <tbody>
                     {detail.histo.map((h) => (
                       <tr key={h.id}>
@@ -193,6 +247,8 @@ export default function AdminPage() {
                         <td><span className="badge gray">{h.action}</span></td>
                         <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
                         <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
+                        <td><button className="btn-icon" title="Supprimer"
+                          onClick={async () => { await deleteHistorique(detail.planning.id, h.id); setDetail((d) => ({ ...d, histo: d.histo.filter((x) => x.id !== h.id) })); }}>✕</button></td>
                       </tr>
                     ))}
                   </tbody>

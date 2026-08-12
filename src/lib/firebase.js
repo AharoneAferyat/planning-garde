@@ -198,6 +198,21 @@ export const watchEvents = (cb, n = 200) =>
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
   );
 
+// Suppression d'événements (admin).
+export const deleteEvent = (id) => deleteDoc(doc(db, 'events', id));
+export const clearEvents = async (ids) => {
+  // supprime en parallèle une liste d'ids d'événements
+  await Promise.all(ids.map((id) => deleteDoc(doc(db, 'events', id)).catch(() => {})));
+};
+
+// Suppression d'une entrée d'historique d'un planning (admin).
+export const deleteHistorique = (planningId, docId) =>
+  deleteDoc(doc(db, 'plannings', planningId, 'historique', docId));
+export const clearHistorique = async (entries) => {
+  // entries : [{ planningId, id }]
+  await Promise.all(entries.map((e) => deleteDoc(doc(db, 'plannings', e.planningId, 'historique', e.id)).catch(() => {})));
+};
+
 // Récupère TOUT (admin only) : tous les plannings, toutes les invitations, tous les membres.
 export const adminFetchAll = async () => {
   const safe = async (p) => {
