@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdmin, adminFetchAll, watchEvents } from '../lib/firebase';
+import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
 export default function AdminPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [events, setEvents] = useState([]);
+  const [allHisto, setAllHisto] = useState(null);   // vue globale des modifs
+  const [detail, setDetail] = useState(null);       // { planning, histo } détail d'un planning
   const [tab, setTab] = useState('events');
   const [loading, setLoading] = useState(true);
 
@@ -18,6 +20,19 @@ export default function AdminPage() {
       .finally(() => setLoading(false));
     return watchEvents(setEvents);
   }, [user]);
+
+  // charge la vue globale des modifs quand on ouvre l'onglet
+  useEffect(() => {
+    if (tab === 'modifs' && allHisto === null && isAdmin(user)) {
+      fetchAllHistorique().then(setAllHisto);
+    }
+  }, [tab, allHisto, user]);
+
+  const openDetail = async (p) => {
+    setDetail({ planning: p, histo: null });
+    const h = await fetchHistorique(p.id);
+    setDetail({ planning: p, histo: h });
+  };
 
   if (!isAdmin(user)) {
     return (
@@ -45,9 +60,9 @@ export default function AdminPage() {
       </div>
 
       <div className="tabs">
-        {['events', 'plannings', 'invitations', 'users'].map((t) => (
+        {['events', 'modifs', 'plannings', 'invitations', 'users'].map((t) => (
           <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {{ events: 'Journal d\'activité', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs' }[t]}
+            {{ events: 'Journal global', modifs: 'Modifs plannings', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs' }[t]}
           </div>
         ))}
       </div>
@@ -74,13 +89,38 @@ export default function AdminPage() {
               </table>
             )}
 
+            {tab === 'modifs' && (
+              allHisto === null ? (
+                <div className="loading-screen" style={{ minHeight: 140 }}><div className="spinner" /></div>
+              ) : (
+                <table className="tbl">
+                  <thead><tr><th>Planning</th><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th></tr></thead>
+                  <tbody>
+                    {allHisto.length === 0 && <tr><td colSpan={5}><div className="empty">Aucune modification enregistrée.</div></td></tr>}
+                    {allHisto.map((h) => {
+                      const pl = data?.plannings.find((p) => p.id === h.planningId);
+                      return (
+                        <tr key={h.id}>
+                          <td style={{ fontWeight: 600 }}>{pl ? (pl.nom || semesterLabel(pl.annee, pl.type)) : h.planningId?.slice(0, 6)}</td>
+                          <td>{h.nom}</td>
+                          <td><span className="badge gray">{h.action}</span></td>
+                          <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
+                          <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            )}
+
             {tab === 'plannings' && (
               <table className="tbl">
-                <thead><tr><th>Nom</th><th>Période</th><th>Propriétaire</th><th>Internes</th><th>Membres</th><th>Créé le</th></tr></thead>
+                <thead><tr><th>Nom (clic → historique)</th><th>Période</th><th>Propriétaire</th><th>Internes</th><th>Membres</th><th>Créé le</th></tr></thead>
                 <tbody>
                   {data.plannings.length === 0 && <tr><td colSpan={6}><div className="empty">Aucun planning.</div></td></tr>}
                   {data.plannings.map((p) => (
-                    <tr key={p.id}>
+                    <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(p)}>
                       <td style={{ fontWeight: 600 }}>{p.nom || semesterLabel(p.annee, p.type)}</td>
                       <td style={{ color: 'var(--muted)' }}>{semesterLabel(p.annee, p.type)}</td>
                       <td>{p.ownerNom}<div style={{ fontSize: '.76rem', color: 'var(--muted)' }}>{p.ownerEmail}</div></td>
@@ -131,15 +171,59 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {detail && (
+        <div className="overlay" onClick={() => setDetail(null)}>
+          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-h">
+              Historique — {detail.planning.nom || semesterLabel(detail.planning.annee, detail.planning.type)}
+            </div>
+            <div className="modal-b" style={{ padding: 0, maxHeight: '60vh', overflowY: 'auto' }}>
+              {detail.histo === null ? (
+                <div className="loading-screen" style={{ minHeight: 120 }}><div className="spinner" /></div>
+              ) : detail.histo.length === 0 ? (
+                <div className="empty">Aucune modification sur ce planning.</div>
+              ) : (
+                <table className="tbl">
+                  <thead><tr><th>Qui</th><th>Action</th><th>Détail</th><th>Quand</th></tr></thead>
+                  <tbody>
+                    {detail.histo.map((h) => (
+                      <tr key={h.id}>
+                        <td style={{ fontWeight: 600 }}>{h.nom}</td>
+                        <td><span className="badge gray">{h.action}</span></td>
+                        <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
+                        <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="modal-f">
+              <button className="btn secondary" onClick={() => setDetail(null)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 function eventLabel(t) {
-  return { login: 'Connexion', join: 'A rejoint', create_planning: 'Planning créé', create_invitation: 'Invitation créée' }[t] || t;
+  return {
+    login: 'Connexion', join: 'A rejoint',
+    create_planning: 'Planning créé', delete_planning: 'Planning supprimé',
+    create_invitation: 'Invitation créée', delete_invitation: 'Invitation supprimée',
+    remove_member: 'Membre retiré', change_role: 'Rôle changé',
+  }[t] || t;
 }
 function eventColor(t) {
-  return { login: 'gray', join: 'green', create_planning: 'blue', create_invitation: 'amber' }[t] || 'gray';
+  return {
+    login: 'gray', join: 'green',
+    create_planning: 'blue', delete_planning: 'red',
+    create_invitation: 'amber', delete_invitation: 'red',
+    remove_member: 'red', change_role: 'amber',
+  }[t] || 'gray';
 }
 function fmtDateTime(ts) {
   const d = new Date(ts);

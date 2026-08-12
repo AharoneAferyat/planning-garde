@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlannings } from '../lib/usePlannings';
-import { deletePlanning } from '../lib/firebase';
+import { deletePlanning, logEvent } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 import NewPlanningModal from './NewPlanningModal';
 
 export default function PlanningsList() {
   const { mine, shared, loading } = usePlannings();
+  const { user } = useAuth();
   const nav = useNavigate();
   const [tab, setTab] = useState('mine');
   const [showNew, setShowNew] = useState(false);
@@ -66,7 +67,7 @@ export default function PlanningsList() {
                         <button className="btn secondary sm" onClick={() => nav(`/planning/${p.id}`)}>Ouvrir</button>
                         {tab === 'mine' && (
                           <button className="btn danger sm"
-                            onClick={() => confirm(`Supprimer « ${p.nom} » ?`) && deletePlanning(p.id)}>
+                            onClick={() => { if (confirm(`Supprimer « ${p.nom} » ?`)) { deletePlanning(p.id); logEvent('delete_planning', user, `A supprimé le planning « ${p.nom || p.id} »`); } }}>
                             Suppr.
                           </button>
                         )}

@@ -120,7 +120,7 @@ export default function Invitations() {
                           : inv.usedBy.map((u) => u.email).join(', ')}
                       </td>
                       <td>
-                        <button className="btn danger sm" onClick={() => deleteInvitation(inv.code)}>Suppr.</button>
+                        <button className="btn danger sm" onClick={() => { deleteInvitation(inv.code); logEvent('delete_invitation', user, `A supprimé l'invitation ${inv.code} (${inv.planningNom || ''})`); }}>Suppr.</button>
                       </td>
                     </tr>
                   ))}

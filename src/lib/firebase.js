@@ -127,6 +127,24 @@ export const watchHistorique = (planningId, cb, n = 20) =>
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
   );
 
+// Récupération ponctuelle (admin) de l'historique d'un planning.
+export const fetchHistorique = async (planningId, n = 100) => {
+  const snap = await getDocs(
+    query(collection(db, 'plannings', planningId, 'historique'), orderBy('at', 'desc'), limit(n))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+};
+
+// Toutes les modifs de tous les plannings (admin) — vue globale inter-plannings.
+export const fetchAllHistorique = async (n = 300) => {
+  try {
+    const snap = await getDocs(
+      query(collectionGroup(db, 'historique'), orderBy('at', 'desc'), limit(n))
+    );
+    return snap.docs.map((d) => ({ id: d.id, planningId: d.ref.parent.parent.id, ...d.data() }));
+  } catch (e) { console.warn('fetchAllHistorique', e?.code || e); return []; }
+};
+
 // ============ INVITATIONS ============
 // invitations/{code} => { code, planningId, planningNom, role, createdBy, createdAt, usedBy:[] }
 const invitationsCol = collection(db, 'invitations');

@@ -33,6 +33,11 @@ service cloud.firestore {
       allow read: if signedIn();
     }
 
+    // Requete collectionGroup sur "historique" (vue globale admin des modifs).
+    match /{path=**}/historique/{doc} {
+      allow read: if isAdmin();
+    }
+
     // ---------- Profils utilisateurs ----------
     // Chacun lit/écrit le sien ; l'admin peut tout lire.
     match /users/{email} {

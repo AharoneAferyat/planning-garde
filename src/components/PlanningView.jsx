@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   watchPlanning, updatePlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences, claimInterne,
-  watchMembres, watchHistorique, logAction, updateMembreRole, removeMembre,
+  watchMembres, watchHistorique, logAction, logEvent, updateMembreRole, removeMembre,
 } from '../lib/firebase';
 import {
   semesterMonthsWithDays, semesterDays, semesterDaysValued, MONTHS_FR, DAYS_FR,
@@ -266,7 +266,7 @@ export default function PlanningView() {
       )}
 
       {tab === 'stats' && <StatsProgress gardes={gardes} internes={internes} days={allDays} todayIso={todayIso} holidays={holidays} />}
-      {tab === 'equipe' && isOwner && <TeamPanel planningId={id} membres={membres} ownerEmail={p.ownerEmail} />}
+      {tab === 'equipe' && isOwner && <TeamPanel planningId={id} planningNom={p.nom} membres={membres} ownerEmail={p.ownerEmail} user={user} />}
       {tab === 'activite' && <ActivityPanel histo={histo} />}
     </>
   );
@@ -649,7 +649,16 @@ function StatsProgress({ gardes, internes, days, todayIso, holidays }) {
   );
 }
 
-function TeamPanel({ planningId, membres, ownerEmail }) {
+function TeamPanel({ planningId, planningNom, membres, ownerEmail, user }) {
+  const changeRole = (email, nom, role) => {
+    updateMembreRole(planningId, email, role);
+    logEvent('change_role', user, `A changé le rôle de ${nom} en ${role === 'editeur' ? 'Éditeur' : 'Invité'} (${planningNom || planningId})`);
+  };
+  const remove = (email, nom) => {
+    if (!confirm(`Retirer ${nom} ?`)) return;
+    removeMembre(planningId, email);
+    logEvent('remove_member', user, `A retiré ${nom} du planning « ${planningNom || planningId} »`);
+  };
   return (
     <div className="card">
       <div className="card-h">Équipe & permissions</div>
@@ -662,14 +671,14 @@ function TeamPanel({ planningId, membres, ownerEmail }) {
                 <td><div style={{ fontWeight: 600 }}>{m.nom}</div>
                   <div style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{m.email}</div></td>
                 <td>{m.email === ownerEmail ? <span className="badge blue">Propriétaire</span> : (
-                  <select value={m.role} onChange={(e) => updateMembreRole(planningId, m.email, e.target.value)}
+                  <select value={m.role} onChange={(e) => changeRole(m.email, m.nom, e.target.value)}
                     style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '.35rem .5rem' }}>
                     <option value="editeur">Éditeur</option>
                     <option value="invite">Invité (lecture)</option>
                   </select>
                 )}</td>
                 <td>{m.email !== ownerEmail && (
-                  <button className="btn danger sm" onClick={() => confirm(`Retirer ${m.nom} ?`) && removeMembre(planningId, m.email)}>Retirer</button>
+                  <button className="btn danger sm" onClick={() => remove(m.email, m.nom)}>Retirer</button>
                 )}</td>
               </tr>
             ))}

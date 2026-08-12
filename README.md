@@ -168,3 +168,16 @@ Les règles (`FIRESTORE_RULES.txt`) ne sont plus permissives. Désormais :
 
 > Note : l'admin est identifié par l'email `aaferyat@gmail.com` (en dur dans les règles ET
 > dans le code). Si tu changes d'email admin, il faut le modifier aux deux endroits.
+
+## Mise à jour — logs suppressions + logs par planning
+- **Journal global** (admin, onglet « Journal global ») : ajoute les **suppressions** (planning,
+  invitation), **retraits de membres** et **changements de rôle**, en plus des créations,
+  connexions et joins. Chaque type a un badge coloré (rouge pour les suppressions/retraits).
+- **Modifs plannings** (nouvel onglet admin) : vue globale de TOUTES les modifications de TOUS
+  les plannings (gardes, présences, internes…) via collectionGroup.
+- **Détail par planning** : dans l'onglet Plannings de l'admin, cliquer une ligne ouvre
+  l'historique complet de ce planning.
+
+### Règles Firestore : à republier
+Ce lot ajoute une règle collectionGroup pour `historique` (vue globale admin).
+Republie `FIRESTORE_RULES.txt` dans Firebase (0 crédit) en plus du déploiement de l'app.
