@@ -12,7 +12,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin(user)) return;
-    adminFetchAll().then((d) => { setData(d); setLoading(false); });
+    adminFetchAll()
+      .then((d) => setData(d))
+      .catch(() => setData({ plannings: [], invitations: [], membres: [], users: [] }))
+      .finally(() => setLoading(false));
     return watchEvents(setEvents);
   }, [user]);
 

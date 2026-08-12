@@ -182,17 +182,18 @@ export const watchEvents = (cb, n = 200) =>
 
 // Récupère TOUT (admin only) : tous les plannings, toutes les invitations, tous les membres.
 export const adminFetchAll = async () => {
+  const safe = async (p) => {
+    try { return await p; } catch (e) { console.warn('adminFetchAll: échec partiel', e?.code || e); return null; }
+  };
   const [plansSnap, invSnap, memSnap, usersSnap] = await Promise.all([
-    getDocs(collection(db, 'plannings')),
-    getDocs(collection(db, 'invitations')),
-    getDocs(collectionGroup(db, 'membres')),
-    getDocs(collection(db, 'users')),
+    safe(getDocs(collection(db, 'plannings'))),
+    safe(getDocs(collection(db, 'invitations'))),
+    safe(getDocs(collectionGroup(db, 'membres'))),
+    safe(getDocs(collection(db, 'users'))),
   ]);
-  const plannings = plansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const invitations = invSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const membres = memSnap.docs.map((d) => ({
-    planningId: d.ref.parent.parent.id, ...d.data(),
-  }));
-  const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const plannings = plansSnap ? plansSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
+  const invitations = invSnap ? invSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
+  const membres = memSnap ? memSnap.docs.map((d) => ({ planningId: d.ref.parent.parent.id, ...d.data() })) : [];
+  const users = usersSnap ? usersSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
   return { plannings, invitations, membres, users };
 };

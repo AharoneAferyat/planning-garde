@@ -23,6 +23,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/plannings/$(pid)).data.ownerEmail == myEmail();
     }
 
+    // ---------- Requetes collectionGroup sur "membres" ----------
+    // Necessaire pour :
+    //  - "mes plannings partages" : collectionGroup(membres) where email == le mien
+    //  - l'admin qui liste tous les membres
+    // Les rules imbriquees plus bas ne couvrent PAS les requetes collectionGroup,
+    // il faut cette regle dediee.
+    match /{path=**}/membres/{email} {
+      allow read: if signedIn();
+    }
+
     // ---------- Profils utilisateurs ----------
     // Chacun lit/écrit le sien ; l'admin peut tout lire.
     match /users/{email} {
