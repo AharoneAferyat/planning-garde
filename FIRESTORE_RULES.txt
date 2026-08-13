@@ -79,7 +79,7 @@ service cloud.firestore {
         allow read: if isAdmin() || isOwner(pid) || isMember(pid);
         allow create: if isAdmin() || isOwner(pid) || isMember(pid);
         allow update: if false; // l'historique ne se modifie pas
-        allow delete: if isAdmin(); // seul l'admin peut purger
+        allow delete: if isAdmin() || isOwner(pid); // purge admin, ou cascade à la suppression du planning
       }
     }
 
@@ -100,6 +100,14 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    // ---------- Liste des bannis ----------
+    // Lecture : chacun peut vérifier son propre statut ; l'admin voit tout.
+    // Écriture : admin uniquement.
+    match /banned/{email} {
+      allow read: if isAdmin() || (signedIn() && myEmail() == email);
+      allow write: if isAdmin();
     }
   }
 }

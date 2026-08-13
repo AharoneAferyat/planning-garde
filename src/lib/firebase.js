@@ -55,7 +55,22 @@ export const createPlanning = (data, owner) =>
     createdAt: Date.now(),
   });
 
-export const deletePlanning = (id) => deleteDoc(doc(db, 'plannings', id));
+// Supprime un planning + ses invitations + ses membres (mais PAS les comptes users).
+export const deletePlanning = async (id) => {
+  try {
+    // 1) invitations liées à ce planning
+    const invSnap = await getDocs(query(collection(db, 'invitations'), where('planningId', '==', id)));
+    await Promise.all(invSnap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+    // 2) membres (sous-collection)
+    const memSnap = await getDocs(collection(db, 'plannings', id, 'membres'));
+    await Promise.all(memSnap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+    // 3) historique (sous-collection) — nettoyage
+    const hisSnap = await getDocs(collection(db, 'plannings', id, 'historique'));
+    await Promise.all(hisSnap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+  } catch (e) { console.warn('deletePlanning cascade', e?.code || e); }
+  // 4) le planning lui-même
+  return deleteDoc(doc(db, 'plannings', id));
+};
 export const updatePlanning = (id, data) => updateDoc(doc(db, 'plannings', id), data);
 export const watchPlanning = (id, cb) =>
   onSnapshot(doc(db, 'plannings', id), (d) =>
@@ -185,6 +200,44 @@ export const joinViaCode = async (code, user) => {
 // events/{auto} => { type:'login'|'join'|'create_planning'|'create_invitation', email, nom, detail, at }
 export const ADMIN_EMAIL = 'aaferyat@gmail.com';
 export const isAdmin = (u) => u?.email === ADMIN_EMAIL;
+
+// Accès fermé : un email est autorisé s'il est admin, propriétaire d'un planning,
+// ou membre d'au moins un planning (= il a déjà rejoint par le passé).
+export const checkAccess = async (email) => {
+  if (!email) return false;
+  if (email === ADMIN_EMAIL) return true;
+  try {
+    // banni ? -> accès refusé même s'il est encore membre quelque part
+    const ban = await getDoc(doc(db, 'banned', email));
+    if (ban.exists()) return false;
+    // membre d'au moins un planning ?
+    const memSnap = await getDocs(
+      query(collectionGroup(db, 'membres'), where('email', '==', email))
+    );
+    if (!memSnap.empty) return true;
+    // propriétaire d'au moins un planning ?
+    const ownSnap = await getDocs(
+      query(collection(db, 'plannings'), where('ownerEmail', '==', email))
+    );
+    return !ownSnap.empty;
+  } catch (e) {
+    console.warn('checkAccess', e?.code || e);
+    return false;
+  }
+};
+
+// Bannir / débannir un utilisateur (admin). Un banni retombe sur l'écran d'invitation.
+export const banUser = (email, by) => setDoc(doc(db, 'banned', email), { email, at: Date.now(), by: by?.email || '?' });
+export const unbanUser = (email) => deleteDoc(doc(db, 'banned', email));
+export const watchBanned = (cb) => onSnapshot(collection(db, 'banned'), (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+
+// Retirer un utilisateur de TOUS les plannings d'un coup (révocation globale, admin).
+export const revokeEverywhere = async (email) => {
+  try {
+    const memSnap = await getDocs(query(collectionGroup(db, 'membres'), where('email', '==', email)));
+    await Promise.all(memSnap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+  } catch (e) { console.warn('revokeEverywhere', e?.code || e); }
+};
 
 export const logEvent = (type, user, detail = '') =>
   addDoc(collection(db, 'events'), {

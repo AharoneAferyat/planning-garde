@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { joinViaCode, watchPlanning, claimInterne, logEvent } from '../lib/firebase';
 
-export default function JoinPage() {
+export default function JoinPage({ onJoined }) {
   const { code } = useParams();
   const { user } = useAuth();
   const nav = useNavigate();
@@ -25,6 +25,7 @@ export default function JoinPage() {
       logEvent('join', user, `A rejoint « ${res.planningNom || res.planningId} » avec le code ${code} (${res.role})`);
       setPlanningId(res.planningId); setRole(res.role);
       setPrenom((user.nom || '').split(' ')[0] || '');
+      onJoined?.();
       setStatus('claim');
     })();
     return () => { done = true; };

@@ -189,3 +189,36 @@ Republie `FIRESTORE_RULES.txt` dans Firebase (0 crédit) en plus du déploiement
   et Modifs plannings (+ suppression dans le détail par planning).
 - **Règles Firestore** : l'admin peut désormais supprimer les événements et les entrées
   d'historique (les autres utilisateurs ne peuvent toujours pas). À republier.
+
+## Mise à jour — accès fermé (sur invitation) + suppression en cascade
+- **Accès fermé** : on n'entre sur le site que si l'email est autorisé = admin, ou déjà
+  membre/propriétaire d'au moins un planning (déjà rejoint par le passé). Sinon → écran
+  « Il te faut une invitation » (message + champ pour coller un code OU un lien).
+  Un lien /join/CODE reste toujours accessible (c'est le moyen d'entrer).
+  Une fois entré, on peut créer ses propres plannings.
+- **Suppression en cascade** : supprimer un planning supprime aussi ses invitations, ses
+  membres et son historique. Les comptes utilisateurs (déjà « connus ») ne sont PAS supprimés.
+  → corrige le compteur d'invitations qui comptait des invitations orphelines.
+
+### Règles Firestore : à republier (elles ont changé)
+Cette fois la règle `historique` autorise aussi le propriétaire à supprimer (nécessaire à la
+cascade). Republie `FIRESTORE_RULES.txt`.
+
+## Mise à jour — révocation, admin en bas, thème jour/nuit
+- **Révocation (3 niveaux)** : par planning (onglet Équipe), « Retirer de tout » (tous les
+  plannings d'un coup), et « Bannir » (retire de tout + bloque le retour : la personne retombe
+  sur l'écran d'invitation). Débannissage possible. Le tout dans l'admin, onglet Utilisateurs.
+- **Administration en bas** de la sidebar (près du profil), plus dans la liste principale.
+- **Thème jour/nuit** : automatique selon l'heure (sombre 20h–7h, clair sinon) + bouton
+  ☀/☾ dans la sidebar pour forcer manuellement. Le choix manuel est mémorisé.
+
+### Règles Firestore : CHANGÉES (à republier)
+Ajout d'une collection `banned` (bannissement) avec ses règles. Republie `FIRESTORE_RULES.txt`.
+
+## Mise à jour — thème "Système" ajouté
+Le bouton thème (☀/☾/◑/🖥, sidebar + barre mobile) cycle maintenant entre 4 modes :
+- **Auto (heure)** — défaut : sombre 20h–7h, clair sinon.
+- **Système** : suit les préférences clair/sombre de l'appareil (PC/navigateur/téléphone),
+  et bascule tout seul si tu changes le thème de ton OS.
+- **Clair** / **Sombre** : forcé manuellement.
+Le mode choisi est mémorisé. (Règles Firestore inchangées.)

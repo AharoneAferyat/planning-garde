@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique } from '../lib/firebase';
+import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique, banUser, unbanUser, watchBanned, revokeEverywhere, logEvent } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
 export default function AdminPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [events, setEvents] = useState([]);
+  const [banned, setBanned] = useState([]);
   const [allHisto, setAllHisto] = useState(null);   // vue globale des modifs
   const [detail, setDetail] = useState(null);       // { planning, histo } détail d'un planning
   const [tab, setTab] = useState('connexions');
@@ -18,8 +19,31 @@ export default function AdminPage() {
       .then((d) => setData(d))
       .catch(() => setData({ plannings: [], invitations: [], membres: [], users: [] }))
       .finally(() => setLoading(false));
-    return watchEvents(setEvents);
+    const unsubE = watchEvents(setEvents);
+    const unsubB = watchBanned(setBanned);
+    return () => { unsubE && unsubE(); unsubB && unsubB(); };
   }, [user]);
+
+  const isBanned = (email) => banned.some((b) => b.email === email);
+
+  const revokeAll = async (email) => {
+    if (!confirm(`Retirer ${email} de TOUS les plannings ?`)) return;
+    await revokeEverywhere(email);
+    logEvent('revoke_all', user, `A retiré ${email} de tous les plannings`);
+    adminFetchAll().then(setData).catch(() => {});
+  };
+  const toggleBan = async (email) => {
+    if (isBanned(email)) {
+      await unbanUser(email);
+      logEvent('unban', user, `A débanni ${email}`);
+    } else {
+      if (!confirm(`Bannir ${email} ? Il devra une nouvelle invitation pour revenir.`)) return;
+      await banUser(email, user);
+      await revokeEverywhere(email); // bannir = retirer de partout aussi
+      logEvent('ban', user, `A banni ${email}`);
+      adminFetchAll().then(setData).catch(() => {});
+    }
+  };
 
   // charge la vue globale des modifs quand on ouvre l'onglet
   useEffect(() => {
@@ -209,16 +233,31 @@ export default function AdminPage() {
 
             {tab === 'users' && (
               <table className="tbl">
-                <thead><tr><th>Nom</th><th>Email</th><th>Dernière connexion</th></tr></thead>
+                <thead><tr><th>Nom</th><th>Email</th><th>Statut</th><th>Dernière connexion</th><th>Actions</th></tr></thead>
                 <tbody>
-                  {data.users.length === 0 && <tr><td colSpan={3}><div className="empty">Aucun utilisateur.</div></td></tr>}
-                  {data.users.map((u) => (
-                    <tr key={u.id}>
-                      <td style={{ fontWeight: 600 }}>{u.nom}</td>
-                      <td style={{ color: 'var(--muted)' }}>{u.email}</td>
-                      <td style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{u.lastLogin ? fmtDateTime(u.lastLogin) : '—'}</td>
-                    </tr>
-                  ))}
+                  {data.users.length === 0 && <tr><td colSpan={5}><div className="empty">Aucun utilisateur.</div></td></tr>}
+                  {data.users.map((u) => {
+                    const admin = u.email === 'aaferyat@gmail.com';
+                    const ban = isBanned(u.email);
+                    return (
+                      <tr key={u.id}>
+                        <td style={{ fontWeight: 600 }}>{u.nom}</td>
+                        <td style={{ color: 'var(--muted)' }}>{u.email}</td>
+                        <td>{admin ? <span className="badge blue">Admin</span> : ban ? <span className="badge red">Banni</span> : <span className="badge green">Actif</span>}</td>
+                        <td style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{u.lastLogin ? fmtDateTime(u.lastLogin) : '—'}</td>
+                        <td>
+                          {admin ? <span style={{ color: 'var(--muted)', fontSize: '.8rem' }}>—</span> : (
+                            <div className="row" style={{ gap: '.4rem' }}>
+                              <button className="btn secondary sm" onClick={() => revokeAll(u.email)}>Retirer de tout</button>
+                              <button className={`btn sm ${ban ? '' : 'danger'}`} onClick={() => toggleBan(u.email)}>
+                                {ban ? 'Débannir' : 'Bannir'}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -271,6 +310,7 @@ function eventLabel(t) {
     create_planning: 'Planning créé', delete_planning: 'Planning supprimé',
     create_invitation: 'Invitation créée', delete_invitation: 'Invitation supprimée',
     remove_member: 'Membre retiré', change_role: 'Rôle changé',
+    revoke_all: 'Retiré de tout', ban: 'Banni', unban: 'Débanni',
   }[t] || t;
 }
 function eventColor(t) {
@@ -279,6 +319,7 @@ function eventColor(t) {
     create_planning: 'blue', delete_planning: 'red',
     create_invitation: 'amber', delete_invitation: 'red',
     remove_member: 'red', change_role: 'amber',
+    revoke_all: 'red', ban: 'red', unban: 'green',
   }[t] || 'gray';
 }
 function fmtDateTime(ts) {

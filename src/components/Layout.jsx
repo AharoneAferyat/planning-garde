@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePhoto } from '../contexts/PhotoContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { isAdmin } from '../lib/firebase';
 
 const NAV = [
@@ -22,7 +23,9 @@ function initials(nom = '') {
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const { background } = usePhoto();
+  const { mode, label, cycle } = useTheme();
   const nav = useNavigate();
+  const themeIcon = { auto: '◑', system: '🖥', light: '☀', dark: '☾' }[mode] || '◑';
 
   return (
     <div className="shell">
@@ -38,14 +41,12 @@ export default function Layout({ children }) {
               <span className="ic">{n.ic}</span> {n.label}
             </NavLink>
           ))}
-          {isAdmin(user) && (
-            <NavLink to="/admin"
-              className={({ isActive }) => isActive ? 'active' : ''}
-              style={{ marginTop: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
-              <span className="ic">⚙</span> Administration
-            </NavLink>
-          )}
         </nav>
+        {isAdmin(user) && (
+          <NavLink to="/admin" className={({ isActive }) => `admin-link ${isActive ? 'active' : ''}`}>
+            <span className="ic">⚙</span> Administration
+          </NavLink>
+        )}
         <div className="foot">
           <div className="avatar">
             {user?.photo ? <img src={user.photo} alt="" /> : initials(user?.nom)}
@@ -54,6 +55,9 @@ export default function Layout({ children }) {
             <div className="n">{user?.nom}</div>
             <div className="r">{user?.email}</div>
           </div>
+          <button className="btn-icon" title={`Thème : ${label} (cliquer pour changer)`} onClick={cycle}>
+            {themeIcon}
+          </button>
           <button className="btn-icon" title="Déconnexion" onClick={logout}>⏻</button>
         </div>
       </aside>
@@ -65,6 +69,7 @@ export default function Layout({ children }) {
         <div className="mobile-top">
           <div className="mark">✚</div>
           <div className="brand">Planning Garde</div>
+          <button className="btn-icon" onClick={cycle} title={`Thème : ${label}`}>{themeIcon}</button>
           <button className="btn-icon" onClick={logout} title="Déconnexion">⏻</button>
         </div>
         <div className="content">{children}</div>
