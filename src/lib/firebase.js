@@ -233,10 +233,13 @@ export const watchBanned = (cb) => onSnapshot(collection(db, 'banned'), (snap) =
 
 // Retirer un utilisateur de TOUS les plannings d'un coup (révocation globale, admin).
 export const revokeEverywhere = async (email) => {
-  try {
-    const memSnap = await getDocs(query(collectionGroup(db, 'membres'), where('email', '==', email)));
-    await Promise.all(memSnap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
-  } catch (e) { console.warn('revokeEverywhere', e?.code || e); }
+  const memSnap = await getDocs(query(collectionGroup(db, 'membres'), where('email', '==', email)));
+  let removed = 0;
+  for (const d of memSnap.docs) {
+    try { await deleteDoc(d.ref); removed += 1; }
+    catch (e) { console.warn('revoke: échec suppression', d.ref.path, e?.code || e); }
+  }
+  return removed; // nb de plannings dont l'utilisateur a été retiré
 };
 
 export const logEvent = (type, user, detail = '') =>

@@ -247,8 +247,14 @@ export function computePresences(gardes, presences, days, internes) {
 // Un interne est-il "en conflit" un jour donné : de garde ALORS qu'il est marqué absent ?
 export function gardeConflit(gardes, presences, iso, interneGarde) {
   if (!interneGarde) return false;
+  // 1) Conflit d'absence : de garde alors que marqué absent (CA/FCP/FCC/AB) ce jour.
   const manual = presences?.[iso]?.[interneGarde];
-  return ABSENT_CODES.includes(manual);
+  if (ABSENT_CODES.includes(manual)) return true;
+  // 2) Conflit de repos : de garde alors qu'il était DÉJÀ de garde la veille
+  //    (il devrait être en repos de sécurité ce jour-là).
+  const prev = shiftIso(iso, -1);
+  if (gardes?.[prev]?.garde === interneGarde) return true;
+  return false;
 }
 
 // ============================================================

@@ -1,0 +1,20 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "historique",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "membres",
+      "fieldPath": "email",
+      "indexes": [
+        { "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" }
+      ]
+    }
+  ]
+}

@@ -29,20 +29,29 @@ export default function AdminPage() {
 
   const revokeAll = async (email) => {
     if (!confirm(`Retirer ${email} de TOUS les plannings ?`)) return;
-    await revokeEverywhere(email);
-    logEvent('revoke_all', user, `A retiré ${email} de tous les plannings`);
-    adminFetchAll().then(setData).catch(() => {});
+    try {
+      const n = await revokeEverywhere(email);
+      logEvent('revoke_all', user, `A retiré ${email} de tous les plannings (${n})`);
+      await adminFetchAll().then(setData);
+      alert(n > 0 ? `${email} retiré de ${n} planning(s).` : `${email} n'était membre d'aucun planning.`);
+    } catch (e) {
+      alert(`Échec : ${e?.code || e}. Si c'est "failed-precondition", il faut créer l'index Firestore (voir console F12).`);
+    }
   };
   const toggleBan = async (email) => {
-    if (isBanned(email)) {
-      await unbanUser(email);
-      logEvent('unban', user, `A débanni ${email}`);
-    } else {
-      if (!confirm(`Bannir ${email} ? Il devra une nouvelle invitation pour revenir.`)) return;
-      await banUser(email, user);
-      await revokeEverywhere(email); // bannir = retirer de partout aussi
-      logEvent('ban', user, `A banni ${email}`);
-      adminFetchAll().then(setData).catch(() => {});
+    try {
+      if (isBanned(email)) {
+        await unbanUser(email);
+        logEvent('unban', user, `A débanni ${email}`);
+      } else {
+        if (!confirm(`Bannir ${email} ? Il devra une nouvelle invitation pour revenir.`)) return;
+        await banUser(email, user);
+        const n = await revokeEverywhere(email); // bannir = retirer de partout aussi
+        logEvent('ban', user, `A banni ${email} (retiré de ${n} planning(s))`);
+        await adminFetchAll().then(setData);
+      }
+    } catch (e) {
+      alert(`Échec : ${e?.code || e}. Si "failed-precondition", crée l'index Firestore (console F12).`);
     }
   };
 
@@ -85,9 +94,9 @@ export default function AdminPage() {
       </div>
 
       <div className="tabs">
-        {['connexions', 'actions', 'modifs', 'plannings', 'invitations', 'users'].map((t) => (
+        {['connexions', 'actions', 'modifs', 'plannings', 'invitations', 'users', 'bannis'].map((t) => (
           <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {{ connexions: 'Connexions', actions: 'Actions', modifs: 'Modifs plannings', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs' }[t]}
+            {{ connexions: 'Connexions', actions: 'Actions', modifs: 'Modifs plannings', plannings: 'Plannings', invitations: 'Invitations', users: 'Utilisateurs', bannis: `Bannis${banned.length ? ` (${banned.length})` : ''}` }[t]}
           </div>
         ))}
       </div>
@@ -259,6 +268,25 @@ export default function AdminPage() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            )}
+
+            {tab === 'bannis' && (
+              <table className="tbl">
+                <thead><tr><th>Email banni</th><th>Banni le</th><th>Par</th><th>Action</th></tr></thead>
+                <tbody>
+                  {banned.length === 0 && <tr><td colSpan={4}><div className="empty">Aucun utilisateur banni.</div></td></tr>}
+                  {banned.map((b) => (
+                    <tr key={b.id}>
+                      <td style={{ fontWeight: 600 }}>{b.email}</td>
+                      <td style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{b.at ? fmtDateTime(b.at) : '—'}</td>
+                      <td style={{ color: 'var(--muted)', fontSize: '.8rem' }}>{b.by || '—'}</td>
+                      <td>
+                        <button className="btn secondary sm" onClick={() => toggleBan(b.email)}>Débannir</button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}

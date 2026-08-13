@@ -280,3 +280,34 @@ Ajout de la sous-collection `echanges`. (déjà inclus avec `notifications` du B
 - (Stats annuelles cross-semestre : non incluse — nécessite d'agréger 2 plannings, à faire dédié.)
 
 ### Règles Firestore : inchangées depuis le Bloc 2 (echanges + notifications déjà couverts).
+
+## Correctifs — conflit "repos" + index Firestore
+- **Marquage rouge réparé** : une garde posée sur quelqu'un qui devrait être en REPOS DE SÉCURITÉ
+  (déjà de garde la veille) est de nouveau signalée en rouge, EN PLUS du cas garde-pendant-absence.
+- **Index Firestore** : l'erreur "The query requires an index" vient de requêtes collectionGroup.
+  Deux solutions :
+  1. SIMPLE : dans la console du navigateur (F12), clique sur le lien d'erreur Firebase
+     (commence par https://console.firebase.google.com/...). Il ouvre l'index pré-rempli →
+     "Créer l'index" → attendre 1-2 min. Répète pour chaque lien d'erreur.
+  2. PROPRE : le fichier firestore.indexes.json contient les index nécessaires
+     (membres.email en COLLECTION_GROUP, historique.at en COLLECTION_GROUP), déployables via
+     Firebase CLI (firebase deploy --only firestore:indexes).
+  C'est à faire UNE fois, 0 crédit Netlify.
+
+## Correctifs — révocation + onglet Bannis
+- **Révocation réparée** : la fonction ne masque plus les erreurs silencieusement. Elle retourne
+  le nombre de plannings dont l'utilisateur a été retiré et affiche un message de confirmation
+  (ou l'erreur exacte). NOTE : si le message est "failed-precondition", c'est l'INDEX Firestore
+  collectionGroup(membres) qui manque → clique le lien d'erreur en console (F12) pour le créer.
+- **Onglet "Bannis"** dans l'admin : liste des utilisateurs bannis (email, date, par qui) avec
+  bouton "Débannir" pour chacun.
+
+## Correctifs responsive mobile (v2)
+- **Onglets scrollables** horizontalement (Planning/Présences/…/Échanges/Équipe/Activité et
+  les onglets admin) : plus de débordement hors écran, on swipe la barre d'onglets.
+- **En-têtes de page** : sur mobile, le titre passe au-dessus et les boutons (Valider/Retour)
+  en dessous, chacun à sa place (fini l'écrasement titre+boutons).
+- **Toolbar planning** : boutons PDF/Calendrier/Mes gardes alignés, « Proposer une répartition »
+  en pleine largeur.
+- **Boutons plus grands** (min 40px) pour le tactile, **modales pleine largeur**, tableaux qui
+  scrollent dans leur carte. (Règles Firestore inchangées.)
