@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Zap, Star, Moon, Plane, BookOpen, GraduationCap, Ban, CalendarCheck, Printer, CalendarPlus, Check } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   watchPlanning, updatePlanning, updatePlanningGardes, updatePlanningInternes, updatePlanningPresences, claimInterne,
   watchMembres, watchHistorique, logAction, logEvent, updateMembreRole, removeMembre,
+  createEchange, watchEchanges, updateEchange, deleteEchange, pushNotifMany, pushNotif,
 } from '../lib/firebase';
 import {
   semesterMonthsWithDays, semesterDays, semesterDaysValued, MONTHS_FR, DAYS_FR,
@@ -13,6 +15,7 @@ import {
   frenchHolidays, holidayName, computePoints,
 } from '../lib/semester';
 import { useIsMobile } from '../lib/useIsMobile';
+import { buildICS, downloadICS } from '../lib/icsExport';
 
 const PALETTE = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#0d9488'];
 
@@ -28,7 +31,9 @@ export default function PlanningView() {
   const [gardes, setGardes] = useState({});
   const [presences, setPresences] = useState({});
   const [planMonthIdx, setPlanMonthIdx] = useState(0);
+  const [mineOnly, setMineOnly] = useState(false);
   const [changed, setChanged] = useState({});      // { iso: true } cases "modifiées" (jaune)
+  const [comments, setComments] = useState({});    // { iso: texte } commentaires par jour
   const [wasRandom, setWasRandom] = useState(false);
   const [editsSinceRandom, setEditsSinceRandom] = useState(0);
 
@@ -37,6 +42,7 @@ export default function PlanningView() {
   useEffect(() => watchHistorique(id, setHisto), [id]);
   useEffect(() => { if (p) { setGardes(p.gardes || {}); setPresences(p.presences || {}); } }, [p?.gardes, p?.presences]);
   useEffect(() => { if (p) { setChanged(p.changed || {}); setWasRandom(!!p.wasRandom); setEditsSinceRandom(p.editsSinceRandom || 0); } }, [p?.changed, p?.wasRandom, p?.editsSinceRandom]);
+  useEffect(() => { if (p) setComments(p.comments || {}); }, [p?.comments]);
 
   const myMembre = membres.find((m) => m.email === user?.email);
   const myRole = myMembre?.role || (p?.ownerEmail === user?.email ? 'proprietaire' : null);
@@ -84,6 +90,13 @@ export default function PlanningView() {
     setChanged(nextChanged);
     setEditsSinceRandom(nextEdits);
     updatePlanning(id, { gardes: nextGardes, changed: nextChanged, editsSinceRandom: nextEdits, ...extra });
+  };
+
+  const setComment = async (iso, texte) => {
+    const next = { ...comments };
+    if (texte && texte.trim()) next[iso] = texte.trim(); else delete next[iso];
+    setComments(next);
+    try { updatePlanning(id, { comments: next }); } catch {}
   };
 
   const setGarde = async (iso, garde, dateLabel) => {
@@ -162,18 +175,33 @@ export default function PlanningView() {
     <>
       <div className="page-head row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1>{p.nom || semesterLabel(p.annee, p.type)}</h1>
+          <h1>{p.nom || semesterLabel(p.annee, p.type)}
+            {p.valide && <span className="badge green" style={{ marginLeft: '.6rem', verticalAlign: 'middle' }}><Check size={12} style={{ verticalAlign: -1, marginRight: 3 }} />Validé</span>}
+          </h1>
           <p>{semesterLabel(p.annee, p.type)} · {internes.length} interne(s) ·{' '}
             <span className={`badge ${isOwner ? 'blue' : canEdit ? 'green' : 'gray'}`}>
               {isOwner ? 'Propriétaire' : canEdit ? 'Éditeur' : 'Invité'}</span></p>
         </div>
-        <button className="btn secondary" onClick={() => nav('/plannings')}>← Retour</button>
+        <div className="row" style={{ gap: '.5rem' }}>
+          {isOwner && (
+            <button className={`btn ${p.valide ? 'secondary' : ''}`}
+              onClick={() => {
+                const v = !p.valide;
+                updatePlanning(id, { valide: v });
+                logAction(id, user, 'statut', v ? 'Planning validé' : 'Validation retirée');
+                if (v) pushNotifMany(membres.map((m) => m.email), { type: 'valide', text: `Le planning « ${p.nom} » a été validé.`, planningId: id });
+              }}>
+              {p.valide ? 'Retirer la validation' : 'Valider le planning'}
+            </button>
+          )}
+          <button className="btn secondary" onClick={() => nav('/plannings')}>← Retour</button>
+        </div>
       </div>
 
       <div className="tabs">
-        {['planning', 'presences', 'internes', 'stats', ...(isOwner ? ['equipe'] : []), 'activite'].map((t) => (
+        {['planning', 'presences', 'internes', 'stats', 'echanges', ...(isOwner ? ['equipe'] : []), 'activite'].map((t) => (
           <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {{ planning: 'Planning', presences: 'Présences', internes: 'Internes', stats: 'Statistiques', equipe: 'Équipe', activite: 'Activité' }[t]}
+            {{ planning: 'Planning', presences: 'Présences', internes: 'Internes', stats: 'Statistiques', echanges: 'Échanges', equipe: 'Équipe', activite: 'Activité' }[t]}
           </div>
         ))}
       </div>
@@ -188,8 +216,24 @@ export default function PlanningView() {
                 Du {fmtFull(allDays[0]?.iso)} au {fmtFull(allDays[allDays.length - 1]?.iso)}
               </span>
               <div className="spacer" />
-              {canEdit && <button className="btn" onClick={runAuto}>⚡ Proposer une répartition</button>}
+              {internes.some((it) => it.email === user?.email) && (
+                <label className="check-row" style={{ marginRight: '.4rem' }}>
+                  <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
+                  <span style={{ fontSize: '.82rem' }}>Mes gardes</span>
+                </label>
+              )}
+              <button className="btn secondary" onClick={() => window.print()} title="Imprimer ou enregistrer en PDF">
+                <Printer size={15} style={{ marginRight: 6, verticalAlign: -2 }} />PDF
+              </button>
+              <button className="btn secondary" onClick={() => {
+                const me = internes.find((it) => it.email === user?.email);
+                downloadICS(buildICS(gardes, p.nom, me?.nom || null), `gardes-${(me?.nom || 'toutes').replace(/\s/g, '-')}.ics`);
+              }} title="Ajouter mes gardes à mon agenda">
+                <CalendarPlus size={15} style={{ marginRight: 6, verticalAlign: -2 }} />Calendrier
+              </button>
+              {canEdit && <button className="btn" onClick={runAuto}><Zap size={16} style={{marginRight:6,verticalAlign:-2}} />Proposer une répartition</button>}
             </div>
+            <LiveEquity gardes={gardes} internes={internes} interneColor={interneColor} />
             {isMobile ? (
               <>
                 <div className="month-nav">
@@ -201,7 +245,7 @@ export default function PlanningView() {
                   <PlanningMonth m={months[planMonthIdx]}
                     gardes={gardes} presences={presences} internes={interneNames}
                     interneColor={interneColor} editable={canEdit} onSet={setGarde}
-                    todayIso={todayIso} holidays={holidays} changed={changed} />
+                    todayIso={todayIso} holidays={holidays} changed={changed} mineOnly={mineOnly} myName={interneNames.find((n) => internes.find((it) => it.nom === n && it.email === user?.email))} comments={comments} onComment={setComment} />
                 )}
               </>
             ) : (
@@ -210,7 +254,7 @@ export default function PlanningView() {
                   <PlanningMonth key={`${m.year}-${m.month}`} m={m}
                     gardes={gardes} presences={presences} internes={interneNames}
                     interneColor={interneColor} editable={canEdit} onSet={setGarde}
-                    todayIso={todayIso} holidays={holidays} changed={changed} />
+                    todayIso={todayIso} holidays={holidays} changed={changed} mineOnly={mineOnly} myName={interneNames.find((n) => internes.find((it) => it.nom === n && it.email === user?.email))} comments={comments} onComment={setComment} />
                 ))}
               </div>
             )}
@@ -245,7 +289,7 @@ export default function PlanningView() {
                       <td>
                         {isMe ? (
                           <span className="row" style={{ gap: '.4rem' }}>
-                            <span className="badge green">★ C'est moi</span>
+                            <span className="badge green"><Star size={12} style={{marginRight:4,verticalAlign:-1}} />C'est moi</span>
                             <button className="btn ghost sm" onClick={() => unclaimMe(idx)}>Retirer</button>
                           </span>
                         ) : it.email ? (
@@ -266,6 +310,10 @@ export default function PlanningView() {
       )}
 
       {tab === 'stats' && <StatsProgress gardes={gardes} internes={internes} days={allDays} todayIso={todayIso} holidays={holidays} />}
+      {tab === 'echanges' && (
+        <EchangesPanel planningId={id} planningNom={p.nom} gardes={gardes} internes={internes}
+          membres={membres} user={user} canEdit={canEdit} onApplied={setGarde} months={months} />
+      )}
       {tab === 'equipe' && isOwner && <TeamPanel planningId={id} planningNom={p.nom} membres={membres} ownerEmail={p.ownerEmail} user={user} />}
       {tab === 'activite' && <ActivityPanel histo={histo} />}
     </>
@@ -273,7 +321,43 @@ export default function PlanningView() {
 }
 
 // ---------- Planning mois V1 : tableau dense ----------
-function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso, holidays, changed = {} }) {
+// Barre d'équité en temps réel : nb de gardes par interne, mise à jour à chaque modif.
+function LiveEquity({ gardes, internes, interneColor }) {
+  const counts = useMemo(() => {
+    const c = Object.fromEntries(internes.map((it) => [it.nom, 0]));
+    Object.values(gardes || {}).forEach((g) => { if (g?.garde && c[g.garde] !== undefined) c[g.garde] += 1; });
+    return c;
+  }, [gardes, internes]);
+  const vals = Object.values(counts);
+  if (internes.length === 0 || vals.every((v) => v === 0)) return null;
+  const max = Math.max(1, ...vals);
+  const min = Math.min(...vals);
+  const spread = max - min; // écart max-min : indicateur d'équité
+
+  return (
+    <div className="equity">
+      <div className="equity-h">
+        <span>Équilibre en temps réel</span>
+        <span className={`equity-badge ${spread <= 1 ? 'ok' : spread <= 3 ? 'warn' : 'bad'}`}>
+          écart {spread}
+        </span>
+      </div>
+      <div className="equity-bars">
+        {internes.map((it) => (
+          <div className="equity-row" key={it.nom}>
+            <span className="equity-name">{it.nom}</span>
+            <div className="equity-track">
+              <div className="equity-fill" style={{ width: `${(counts[it.nom] / max) * 100}%`, background: it.couleur || 'var(--blue)' }} />
+            </div>
+            <span className="equity-val">{counts[it.nom]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlanningMonth({ m, gardes, presences, internes, interneColor, editable, onSet, todayIso, holidays, changed = {}, mineOnly = false, myName = null, comments = {}, onComment }) {
   const days = m.days;
   const byIso = {}; days.forEach((d) => { byIso[d.iso] = d; });
   return (
@@ -281,7 +365,7 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
       <div className="pm-h">{MONTHS_FR[m.month]} {m.year}</div>
       <table className={`pt ${editable ? '' : 'readonly'}`}>
         <thead>
-          <tr><th style={{ textAlign: 'left' }}>Jour</th><th>Garde</th><th>Repos</th><th>V+D</th><th>Val.</th></tr>
+          <tr><th style={{ textAlign: 'left' }}>Jour</th><th>Garde</th><th>Repos</th><th>V+D</th><th>Val.</th><th>Note</th></tr>
         </thead>
         <tbody>
           {days.map((d) => {
@@ -295,11 +379,13 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
             const val = ferie || d.isSun ? '2×' : d.isSat ? '1,5×' : '1×';
             const rc = conflit ? 'conflit' : ferie ? 'fer' : d.isSun ? 'sun' : d.isWeekend ? 'we' : '';
             const isChanged = !!changed[d.iso];
+            const isMineGarde = myName && garde === myName;
+            const dimmed = mineOnly && !isMineGarde;
             const bad = doublon || conflit;
             const col = interneColor[garde];
             const dl = `${DAYS_FR[d.weekday]} ${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}`;
             return (
-              <tr key={d.iso} className={`${rc} ${isChanged ? 'changed' : ''}`}>
+              <tr key={d.iso} className={`${rc} ${isChanged ? 'changed' : ''} ${dimmed ? 'dimmed' : ''} ${isMineGarde && mineOnly ? 'mine-hl' : ''}`}>
                 <td className="pdd">
                   {DAYS_FR[d.weekday]} <b>{String(d.day).padStart(2, '0')}/{String(d.month).padStart(2, '0')}</b>
                   {ferie && <span className="ferbadge" title={holidayName(d.iso)}>FÉRIÉ</span>}
@@ -320,6 +406,15 @@ function PlanningMonth({ m, gardes, presences, internes, interneColor, editable,
                 <td className="prep">{repos}</td>
                 <td className="pvd">{vd ? 'V+D' : ''}</td>
                 <td className="pval">{val}</td>
+                <td className="pnote">
+                  {editable ? (
+                    <input type="text" className="note-input" value={comments[d.iso] || ''}
+                      placeholder="+ note"
+                      onChange={(e) => onComment(d.iso, e.target.value)} />
+                  ) : (
+                    comments[d.iso] ? <span className="note-txt" title={comments[d.iso]}>{comments[d.iso]}</span> : ''
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -460,12 +555,12 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
 
       {/* Résumé de la période */}
       <div className="grid cols-3" style={{ marginTop: '1.25rem' }}>
-        <SummaryCard ic="☰" cls="blue" v={totals.G} l="Gardes planifiées" />
-        <SummaryCard ic="☾" cls="purple" v={totals.RS} l="Repos de sécurité" />
-        <SummaryCard ic="✈" cls="green" v={totals.CA} l="Congés" />
-        <SummaryCard ic="◈" cls="amber" v={totals.FCP} l="Formations perso" />
-        <SummaryCard ic="◆" cls="amber" v={totals.FCC} l="Formations coordo" />
-        <SummaryCard ic="✚" cls="red" v={totals.AB} l="Absences" />
+        <SummaryCard Icon={CalendarCheck} cls="blue" v={totals.G} l="Gardes planifiées" />
+        <SummaryCard Icon={Moon} cls="purple" v={totals.RS} l="Repos de sécurité" />
+        <SummaryCard Icon={Plane} cls="green" v={totals.CA} l="Congés" />
+        <SummaryCard Icon={BookOpen} cls="amber" v={totals.FCP} l="Formations perso" />
+        <SummaryCard Icon={GraduationCap} cls="amber" v={totals.FCC} l="Formations coordo" />
+        <SummaryCard Icon={Ban} cls="red" v={totals.AB} l="Absences" />
       </div>
 
       {menu && (
@@ -480,6 +575,7 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
               { code: 'FCP', label: 'Formation perso' },
               { code: 'FCC', label: 'Formation coordo' },
               { code: 'AB', label: 'Absence' },
+              { code: 'INDISPO', label: 'Indisponible (souhait)' },
               { code: '', label: 'Vide' },
             ].map((o) => {
               const st = PRESENCE_MAP[o.code];
@@ -500,10 +596,10 @@ function PresencesTab({ months, internes, gardes, presences, editable, onSetPres
   );
 }
 
-function SummaryCard({ ic, cls, v, l }) {
+function SummaryCard({ Icon, cls, v, l }) {
   return (
     <div className="stat">
-      <div className={`ic ${cls}`}>{ic}</div>
+      <div className={`ic ${cls}`}>{Icon && <Icon size={18} />}</div>
       <div><div className="v">{v}</div><div className="l">{l}</div></div>
     </div>
   );
@@ -686,6 +782,148 @@ function TeamPanel({ planningId, planningNom, membres, ownerEmail, user }) {
         </table>
       </div>
     </div>
+  );
+}
+
+// Panneau des échanges de gardes : proposer une de ses gardes, accepter celle d'un autre.
+function EchangesPanel({ planningId, planningNom, gardes, internes, membres, user, canEdit, onApplied, months }) {
+  const [echanges, setEchanges] = useState([]);
+  const [selectedIso, setSelectedIso] = useState('');
+
+  useEffect(() => watchEchanges(planningId, setEchanges), [planningId]);
+
+  // Quel interne suis-je dans ce planning ? (via email)
+  const me = internes.find((it) => it.email === user?.email);
+  const myName = me?.nom;
+
+  // Mes gardes à venir (celles dont je suis le garde), pour proposer un échange.
+  const allDays = months.flatMap((m) => m.days);
+  const todayIso = isoDate(new Date());
+  const myGardes = allDays.filter((d) => d.iso >= todayIso && gardes?.[d.iso]?.garde === myName);
+
+  const emailsOfOthers = membres.filter((m) => m.email !== user?.email).map((m) => m.email);
+
+  const propose = async () => {
+    if (!selectedIso || !myName) return;
+    const d = allDays.find((x) => x.iso === selectedIso);
+    const dateLabel = d ? `${DAYS_FR[d.weekday]} ${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}` : selectedIso;
+    await createEchange(planningId, {
+      iso: selectedIso, dateLabel, fromNom: myName, fromEmail: user.email,
+    });
+    logAction(planningId, user, 'echange', `Propose d'échanger sa garde du ${dateLabel}`);
+    pushNotifMany(emailsOfOthers, {
+      type: 'echange', text: `${myName} propose d'échanger sa garde du ${dateLabel} (${planningNom}).`, planningId,
+    });
+    setSelectedIso('');
+  };
+
+  const accept = async (e) => {
+    if (!myName) { alert("Tu dois d'abord t'identifier comme interne (onglet Internes) pour accepter."); return; }
+    if (e.fromNom === myName) { alert("Tu ne peux pas accepter ta propre garde."); return; }
+    if (!confirm(`Reprendre la garde du ${e.dateLabel} (actuellement à ${e.fromNom}) ?`)) return;
+    // applique le changement de garde
+    await onApplied(e.iso, myName, e.dateLabel);
+    await updateEchange(planningId, e.id, { status: 'accepte', takenByNom: myName, takenByEmail: user.email });
+    logAction(planningId, user, 'echange', `${myName} reprend la garde du ${e.dateLabel} (de ${e.fromNom})`);
+    // notifie le proposeur
+    pushNotif(e.fromEmail, {
+      type: 'echange', text: `${myName} a repris ta garde du ${e.dateLabel} (${planningNom}).`, planningId,
+    });
+  };
+
+  const cancel = async (e) => {
+    if (!confirm('Annuler cette proposition ?')) return;
+    await deleteEchange(planningId, e.id);
+  };
+
+  const ouverts = echanges.filter((e) => e.status === 'ouvert');
+  const passes = echanges.filter((e) => e.status !== 'ouvert');
+
+  return (
+    <>
+      {!myName && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-b">
+            <div style={{ color: 'var(--muted)' }}>
+              Pour proposer ou accepter un échange, identifie-toi comme interne dans l'onglet <b>Internes</b> (bouton « C'est moi »).
+            </div>
+          </div>
+        </div>
+      )}
+
+      {myName && canEdit && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-h">Proposer un échange</div>
+          <div className="card-b">
+            {myGardes.length === 0 ? (
+              <div style={{ color: 'var(--muted)' }}>Tu n'as pas de garde à venir à proposer.</div>
+            ) : (
+              <div className="row" style={{ gap: '.6rem', flexWrap: 'wrap' }}>
+                <select value={selectedIso} onChange={(e) => setSelectedIso(e.target.value)}
+                  style={{ minWidth: 220 }}>
+                  <option value="">Choisis une de tes gardes…</option>
+                  {myGardes.map((d) => (
+                    <option key={d.iso} value={d.iso}>
+                      {DAYS_FR[d.weekday]} {String(d.day).padStart(2, '0')}/{String(d.month).padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn" onClick={propose} disabled={!selectedIso}>Proposer l'échange</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-h">Échanges ouverts</div>
+        <div className="card-b" style={{ padding: 0 }}>
+          {ouverts.length === 0 ? (
+            <div className="empty">Aucun échange proposé pour l'instant.</div>
+          ) : (
+            <table className="tbl">
+              <thead><tr><th>Garde</th><th>Proposée par</th><th></th></tr></thead>
+              <tbody>
+                {ouverts.map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ fontWeight: 600 }}>{e.dateLabel}</td>
+                    <td>{e.fromNom}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {e.fromEmail === user?.email ? (
+                        <button className="btn danger sm" onClick={() => cancel(e)}>Annuler</button>
+                      ) : (
+                        <button className="btn sm" onClick={() => accept(e)} disabled={!canEdit}>Reprendre</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {passes.length > 0 && (
+        <div className="card">
+          <div className="card-h">Historique des échanges</div>
+          <div className="card-b" style={{ padding: 0 }}>
+            <table className="tbl">
+              <thead><tr><th>Garde</th><th>De</th><th>Repris par</th><th>Statut</th></tr></thead>
+              <tbody>
+                {passes.map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ fontWeight: 600 }}>{e.dateLabel}</td>
+                    <td>{e.fromNom}</td>
+                    <td>{e.takenByNom || '—'}</td>
+                    <td><span className={`badge ${e.status === 'accepte' ? 'green' : 'gray'}`}>{e.status === 'accepte' ? 'Échangée' : 'Annulée'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

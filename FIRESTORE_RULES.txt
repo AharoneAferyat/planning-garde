@@ -81,6 +81,14 @@ service cloud.firestore {
         allow update: if false; // l'historique ne se modifie pas
         allow delete: if isAdmin() || isOwner(pid); // purge admin, ou cascade à la suppression du planning
       }
+
+      // --- Échanges de gardes : membres du planning ---
+      match /echanges/{doc} {
+        allow read: if isAdmin() || isOwner(pid) || isMember(pid);
+        allow create: if isAdmin() || isOwner(pid) || isMember(pid);
+        allow update: if isAdmin() || isOwner(pid) || isMember(pid);
+        allow delete: if isAdmin() || isOwner(pid) || isMember(pid);
+      }
     }
 
     // ---------- Invitations ----------
@@ -100,6 +108,14 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    // ---------- Notifications in-app ----------
+    // Chacun lit/gère les siennes. Tout connecté peut CRÉER une notif pour
+    // quelqu'un d'autre (pour le prévenir : garde, échange, invitation...).
+    match /notifications/{email}/items/{id} {
+      allow read, update, delete: if signedIn() && myEmail() == email;
+      allow create: if signedIn();
     }
 
     // ---------- Liste des bannis ----------

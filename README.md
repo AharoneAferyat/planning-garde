@@ -222,3 +222,61 @@ Le bouton thème (☀/☾/◑/🖥, sidebar + barre mobile) cycle maintenant ent
   et bascule tout seul si tu changes le thème de ton OS.
 - **Clair** / **Sombre** : forcé manuellement.
 Le mode choisi est mémorisé. (Règles Firestore inchangées.)
+
+## Révision / audit (nettoyage + robustesse)
+- **Icônes** : remplacement des glyphes unicode (◑ 🖥 ▦ ▤ ✉ ⚙ ☰ ◈…) par une vraie
+  librairie d'icônes SVG (lucide-react) → rendu identique sur tous les appareils/navigateurs,
+  fini les icônes qui buggaient.
+- **Responsive** : les tableaux de l'admin scrollent horizontalement sur mobile au lieu de
+  casser la mise en page.
+- **Robustesse** : accès `parent.parent` sécurisés (optional chaining), thème purple adapté
+  au mode sombre.
+- **Code mort** : aucun fichier/export réellement inutilisé (QRCode, tous les helpers firebase
+  sont utilisés). Les `console.warn` restants sont des diagnostics d'erreur volontaires.
+- (Règles Firestore inchangées.)
+
+## Bloc 1 — Notifications in-app + envoi par email (mailto)
+- **Cloche de notifications** (sidebar + barre mobile) : badge de non-lus, panneau déroulant,
+  clic sur une notif → ouvre le planning concerné, « tout marquer lu », suppression.
+- **Envoi d'invitation par email** : après avoir généré un code, un bloc « Envoyer par email »
+  permet de choisir les destinataires (checkboxes par membre + « tout cocher / aucun » +
+  champ pour d'autres emails), puis « Ouvrir l'email » ouvre ta messagerie avec le message
+  prérempli (lien + code). Aucun serveur, aucun risque de spam.
+
+### Règles Firestore : CHANGÉES (à republier)
+Ajout de la collection `notifications` (in-app). Republie `FIRESTORE_RULES.txt`.
+
+> À venir : Bloc 2 (indispos + échange de gardes), Bloc 3 (PDF + .ics), Bloc 4 (confort).
+> Email automatique (Resend) : optionnel, guidé plus tard.
+
+## Bloc 2 — Indisponibilités + Échange de gardes
+- **Indisponibilités (souhaits)** : nouveau statut « INDISPO » posable dans les présences.
+  L'algo de répartition auto ÉVITE de donner une garde à un interne sur ses jours indispo
+  (souple : il n'y va que s'il n'y a aucun autre choix). Testé : 0 garde sur jours indispo.
+- **Échange de gardes** (onglet « Échanges ») : un interne identifié propose une de ses gardes
+  à venir → les autres membres reçoivent une notif → un autre la reprend (la garde change de
+  main + notif de confirmation au proposeur). Historique des échanges. Annulation possible.
+
+### Règles Firestore : CHANGÉES (à republier)
+Ajout de la sous-collection `echanges`. (déjà inclus avec `notifications` du Bloc 1.)
+
+## Bloc 3 — Export PDF + Calendrier (.ics)
+- **PDF / Impression** : bouton « PDF » dans le planning → ouvre l'impression du navigateur
+  (choisir « Enregistrer en PDF »). Mise en page épurée (sidebar/onglets masqués, tous les mois,
+  thème clair forcé, orientation paysage). Zéro librairie ajoutée.
+- **Calendrier (.ics)** : bouton « Calendrier » → télécharge un fichier .ics de TES gardes
+  (si tu es identifié comme interne) importable dans Google Agenda / Apple Calendar / Outlook.
+  Événements « journée entière ». (Règles Firestore inchangées pour ce bloc.)
+
+## Bloc 4 — Confort
+- **Vue « Mes gardes »** : case à cocher dans le planning qui met en avant tes gardes (le reste estompé).
+- **Équilibre en temps réel** : barres par interne + indicateur d'écart (vert/ambre/rouge),
+  mis à jour à chaque modification.
+- **Notes par jour** : colonne « Note » dans le planning (ex. « garde double », « senior : Dr X »).
+- **Duplication de semestre** : bouton copier dans « Mes plannings » → repart des mêmes internes
+  et réglages, sans les gardes (nouveau semestre vierge).
+- **Validation du planning** (rôle chef de service) : le propriétaire peut « Valider » le planning
+  → badge « Validé » + notification à tous les membres.
+- (Stats annuelles cross-semestre : non incluse — nécessite d'agréger 2 plannings, à faire dédié.)
+
+### Règles Firestore : inchangées depuis le Bloc 2 (echanges + notifications déjà couverts).

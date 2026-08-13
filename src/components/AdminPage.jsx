@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { X } from 'lucide-react';
 import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique, banUser, unbanUser, watchBanned, revokeEverywhere, logEvent } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
@@ -115,7 +116,7 @@ export default function AdminPage() {
                           <td style={{ fontWeight: 600 }}>{e.nom}</td>
                           <td style={{ color: 'var(--muted)' }}>{e.email}</td>
                           <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(e.at)}</td>
-                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}>✕</button></td>
+                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}><X size={15} /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -144,7 +145,7 @@ export default function AdminPage() {
                           <td><div style={{ fontWeight: 600 }}>{e.nom}</div><div style={{ fontSize: '.76rem', color: 'var(--muted)' }}>{e.email}</div></td>
                           <td style={{ color: 'var(--muted)' }}>{e.detail}</td>
                           <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(e.at)}</td>
-                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}>✕</button></td>
+                          <td><button className="btn-icon" title="Supprimer" onClick={() => deleteEvent(e.id)}><X size={15} /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -182,7 +183,7 @@ export default function AdminPage() {
                             <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
                             <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
                             <td><button className="btn-icon" title="Supprimer"
-                              onClick={async () => { await deleteHistorique(h.planningId, h.id); setAllHisto((prev) => prev.filter((x) => x.id !== h.id)); }}>✕</button></td>
+                              onClick={async () => { await deleteHistorique(h.planningId, h.id); setAllHisto((prev) => prev.filter((x) => x.id !== h.id)); }}><X size={15} /></button></td>
                           </tr>
                         );
                       })}
@@ -287,7 +288,7 @@ export default function AdminPage() {
                         <td style={{ color: 'var(--muted)' }}>{h.detail}</td>
                         <td style={{ color: 'var(--muted)', fontSize: '.8rem', whiteSpace: 'nowrap' }}>{fmtDateTime(h.at)}</td>
                         <td><button className="btn-icon" title="Supprimer"
-                          onClick={async () => { await deleteHistorique(detail.planning.id, h.id); setDetail((d) => ({ ...d, histo: d.histo.filter((x) => x.id !== h.id) })); }}>✕</button></td>
+                          onClick={async () => { await deleteHistorique(detail.planning.id, h.id); setDetail((d) => ({ ...d, histo: d.histo.filter((x) => x.id !== h.id) })); }}><X size={15} /></button></td>
                       </tr>
                     ))}
                   </tbody>

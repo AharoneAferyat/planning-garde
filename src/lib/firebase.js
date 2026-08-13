@@ -122,7 +122,7 @@ export const watchSharedPlanningIds = (email, cb) =>
     (snap) => {
       // chaque doc membre a un parent = planning
       const items = snap.docs.map((d) => ({
-        planningId: d.ref.parent.parent.id,
+        planningId: d.ref.parent?.parent?.id,
         role: d.data().role,
       }));
       cb(items);
@@ -156,7 +156,7 @@ export const fetchAllHistorique = async (n = 300) => {
     const snap = await getDocs(
       query(collectionGroup(db, 'historique'), orderBy('at', 'desc'), limit(n))
     );
-    return snap.docs.map((d) => ({ id: d.id, planningId: d.ref.parent.parent.id, ...d.data() }));
+    return snap.docs.map((d) => ({ id: d.id, planningId: d.ref.parent?.parent?.id, ...d.data() }));
   } catch (e) { console.warn('fetchAllHistorique', e?.code || e); return []; }
 };
 
@@ -279,7 +279,73 @@ export const adminFetchAll = async () => {
   ]);
   const plannings = plansSnap ? plansSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
   const invitations = invSnap ? invSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-  const membres = memSnap ? memSnap.docs.map((d) => ({ planningId: d.ref.parent.parent.id, ...d.data() })) : [];
+  const membres = memSnap ? memSnap.docs.map((d) => ({ planningId: d.ref.parent?.parent?.id, ...d.data() })) : [];
   const users = usersSnap ? usersSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
   return { plannings, invitations, membres, users };
+};
+
+// ============ NOTIFICATIONS IN-APP ============
+// notifications/{email}/items/{auto} : { type, text, planningId?, read, at }
+export const pushNotif = (email, notif) =>
+  addDoc(collection(db, 'notifications', email, 'items'), {
+    ...notif, read: false, at: Date.now(),
+  });
+
+// Envoie une notif à plusieurs destinataires (emails).
+export const pushNotifMany = async (emails, notif) => {
+  await Promise.all((emails || []).filter(Boolean).map((e) => pushNotif(e, notif).catch(() => {})));
+};
+
+export const watchNotifs = (email, cb, n = 30) =>
+  onSnapshot(
+    query(collection(db, 'notifications', email, 'items'), orderBy('at', 'desc'), limit(n)),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  );
+
+export const markNotifRead = (email, id) =>
+  updateDoc(doc(db, 'notifications', email, 'items', id), { read: true });
+
+export const markAllNotifsRead = async (email, ids) => {
+  await Promise.all((ids || []).map((id) => markNotifRead(email, id).catch(() => {})));
+};
+
+export const deleteNotif = (email, id) =>
+  deleteDoc(doc(db, 'notifications', email, 'items', id));
+
+// ============ ÉCHANGES DE GARDES ============
+// plannings/{pid}/echanges/{auto} : { iso, dateLabel, fromNom, fromEmail, status:'ouvert'|'accepte'|'annule', takenByNom?, takenByEmail?, at }
+export const createEchange = (pid, data) =>
+  addDoc(collection(db, 'plannings', pid, 'echanges'), { ...data, status: 'ouvert', at: Date.now() });
+
+export const watchEchanges = (pid, cb) =>
+  onSnapshot(
+    query(collection(db, 'plannings', pid, 'echanges'), orderBy('at', 'desc')),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  );
+
+export const updateEchange = (pid, id, data) =>
+  updateDoc(doc(db, 'plannings', pid, 'echanges', id), data);
+
+export const deleteEchange = (pid, id) =>
+  deleteDoc(doc(db, 'plannings', pid, 'echanges', id));
+
+// ============ DUPLICATION DE SEMESTRE ============
+// Duplique un planning (internes + réglages) SANS les gardes/présences (nouveau semestre vierge).
+export const duplicatePlanning = async (sourceId, newData, owner) => {
+  const src = await getDoc(doc(db, 'plannings', sourceId));
+  if (!src.exists()) return null;
+  const s = src.data();
+  const ref = await addDoc(planningsCol, {
+    nom: newData.nom || `${s.nom} (copie)`,
+    annee: newData.annee ?? s.annee,
+    type: newData.type ?? s.type,
+    internes: (s.internes || []).map((it) => ({ ...it, email: '' })), // on garde les internes, on délie les identités
+    gardes: {}, presences: {}, changed: {}, wasRandom: false, editsSinceRandom: 0,
+    ownerEmail: owner.email, ownerNom: owner.nom || owner.email,
+    statut: 'actif', createdAt: Date.now(),
+  });
+  await setDoc(doc(db, 'plannings', ref.id, 'membres', owner.email), {
+    email: owner.email, nom: owner.nom || owner.email, role: 'proprietaire', addedAt: Date.now(),
+  });
+  return ref.id;
 };

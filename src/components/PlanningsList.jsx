@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlannings } from '../lib/usePlannings';
-import { deletePlanning, logEvent } from '../lib/firebase';
+import { Copy } from 'lucide-react';
+import { deletePlanning, logEvent, duplicatePlanning } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 import NewPlanningModal from './NewPlanningModal';
 
@@ -66,10 +67,22 @@ export default function PlanningsList() {
                       <div className="row">
                         <button className="btn secondary sm" onClick={() => nav(`/planning/${p.id}`)}>Ouvrir</button>
                         {tab === 'mine' && (
+                          <>
+                          <button className="btn secondary sm" title="Dupliquer (nouveau semestre)"
+                            onClick={async () => {
+                              const nom = prompt('Nom du nouveau planning :', `${p.nom} (copie)`);
+                              if (nom === null) return;
+                              const newId = await duplicatePlanning(p.id, { nom: nom.trim() || `${p.nom} (copie)` }, user);
+                              logEvent('create_planning', user, `A dupliqué « ${p.nom} » → « ${nom}»`);
+                              if (newId) nav(`/planning/${newId}`);
+                            }}>
+                            <Copy size={13} />
+                          </button>
                           <button className="btn danger sm"
                             onClick={() => { if (confirm(`Supprimer « ${p.nom} » ?`)) { deletePlanning(p.id); logEvent('delete_planning', user, `A supprimé le planning « ${p.nom || p.id} »`); } }}>
                             Suppr.
                           </button>
+                          </>
                         )}
                       </div>
                     </td>

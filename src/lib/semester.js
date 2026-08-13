@@ -207,6 +207,7 @@ export const PRESENCE_STATUSES = [
   { code: 'FCP', label: 'Formation perso', color: '#fde68a', text: '#92400e' },
   { code: 'FCC', label: 'Formation coordonateur', color: '#fed7aa', text: '#9a3412' },
   { code: 'AB', label: 'Absence', color: '#fecaca', text: '#991b1b' },
+  { code: 'INDISPO', label: 'Indisponible (souhait)', color: '#e5e7eb', text: '#475569', wish: true },
 ];
 export const PRESENCE_MAP = Object.fromEntries(PRESENCE_STATUSES.map((s) => [s.code, s]));
 
@@ -499,18 +500,26 @@ export function autoDistributeV2(days, internes, opts = {}) {
       if (cands.length === 0) cands = names.filter((n) => !isAdjacent(d.iso, n));
       if (cands.length === 0) return;
 
-      // Priorité : équilibrer d'abord la CATÉGORIE du jour (fériés entre eux,
-      // dimanches entre eux, etc.), puis les points, puis le nb total de gardes.
+      // Priorité : on évite d'abord ceux qui ont posé "indisponible" (souhait),
+      // puis on équilibre la CATÉGORIE du jour (fériés/dimanches/samedis),
+      // puis les points, puis le nb total de gardes.
+      const wishAvoid = (n) => (presences?.[d.iso]?.[n] === 'INDISPO' ? 1 : 0);
       cands.sort((a, b) => {
+        const dw = wishAvoid(a) - wishAvoid(b); if (dw !== 0) return dw; // non-indispo d'abord
         if (ck) { const dc = cat[a][ck] - cat[b][ck]; if (dc !== 0) return dc; }
         const dp = pts[a] - pts[b]; if (Math.abs(dp) > 0.01) return dp;
         const dg = cntSem[a] - cntSem[b]; if (dg !== 0) return dg;
         return rnd() - 0.5;
       });
-      // un peu d'aléatoire parmi les ex-æquo du meilleur score
+      // un peu d'aléatoire parmi les ex-æquo du meilleur score,
+      // mais on ne pioche parmi les "indisponibles" que si tous le sont.
       const best = cands[0];
+      const bestWish = presences?.[d.iso]?.[best] === 'INDISPO' ? 1 : 0;
       const bestScore = ck ? cat[best][ck] : cntSem[best];
-      const tied = cands.filter((n) => (ck ? cat[n][ck] : cntSem[n]) === bestScore);
+      const tied = cands.filter((n) => {
+        const w = presences?.[d.iso]?.[n] === 'INDISPO' ? 1 : 0;
+        return w === bestWish && (ck ? cat[n][ck] : cntSem[n]) === bestScore;
+      });
       const pick = tied[Math.floor(rnd() * tied.length)];
 
       result[d.iso] = pick;
