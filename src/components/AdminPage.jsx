@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { X } from 'lucide-react';
-import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique, banUser, unbanUser, watchBanned, revokeEverywhere, logEvent } from '../lib/firebase';
+import { isAdmin, adminFetchAll, watchEvents, fetchHistorique, fetchAllHistorique, deleteEvent, clearEvents, deleteHistorique, clearHistorique, banUser, unbanUser, watchBanned, revokeEverywhere, logEvent, deleteInvitation } from '../lib/firebase';
 import { semesterLabel } from '../lib/semester';
 
 export default function AdminPage() {
@@ -223,17 +223,29 @@ export default function AdminPage() {
 
             {tab === 'invitations' && (
               <table className="tbl">
-                <thead><tr><th>Code</th><th>Planning</th><th>Rôle</th><th>Créée par</th><th>Utilisée par</th></tr></thead>
+                <thead><tr><th>Code</th><th>Planning</th><th>Rôle</th><th>Créée par</th><th>Utilisée par</th><th>Action</th></tr></thead>
                 <tbody>
-                  {data.invitations.length === 0 && <tr><td colSpan={5}><div className="empty">Aucune invitation.</div></td></tr>}
+                  {data.invitations.length === 0 && <tr><td colSpan={6}><div className="empty">Aucune invitation.</div></td></tr>}
                   {data.invitations.map((inv) => (
                     <tr key={inv.id}>
-                      <td className="mono" style={{ fontWeight: 700 }}>{inv.code}</td>
-                      <td>{inv.planningNom}</td>
+                      <td className="mono" style={{ fontWeight: 700 }}>{inv.code || inv.id}</td>
+                      <td>{inv.planningNom || <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>planning supprimé</span>}</td>
                       <td><span className={`badge ${inv.role === 'editeur' ? 'green' : 'gray'}`}>{inv.role === 'editeur' ? 'Éditeur' : 'Invité'}</span></td>
                       <td style={{ fontSize: '.82rem' }}>{inv.createdBy}</td>
                       <td style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
                         {(inv.usedBy?.length || 0) === 0 ? '—' : inv.usedBy.map((u) => u.email).join(', ')}
+                      </td>
+                      <td>
+                        <button className="btn danger sm" title="Supprimer cette invitation"
+                          onClick={async () => {
+                            try {
+                              await deleteInvitation(inv.code || inv.id);
+                              logEvent('delete_invitation', user, `A supprimé l'invitation ${inv.code || inv.id}`);
+                              await adminFetchAll().then(setData);
+                            } catch (e) { alert(`Échec : ${e?.code || e}`); }
+                          }}>
+                          <X size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}

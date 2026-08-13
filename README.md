@@ -311,3 +311,19 @@ Ajout de la sous-collection `echanges`. (déjà inclus avec `notifications` du B
   en pleine largeur.
 - **Boutons plus grands** (min 40px) pour le tactile, **modales pleine largeur**, tableaux qui
   scrollent dans leur carte. (Règles Firestore inchangées.)
+
+## Correctifs (lot du 14) — thème sombre, invitations, admin mobile
+- **Thème sombre lisible** : le panneau de notifications et ses textes ont maintenant des
+  couleurs explicites (fini le gris sur gris illisible).
+- **Suppression d'invitations** : l'onglet Invitations de l'admin a enfin un bouton Supprimer
+  (croix rouge) — utile pour les invitations orphelines (planning supprimé). Les plannings
+  supprimés affichent "planning supprimé" au lieu d'un vide.
+- **Accès admin sur mobile** : lien "Admin" ajouté dans la barre de navigation du bas (visible
+  uniquement pour l'admin), puisque la sidebar est masquée sur téléphone.
+- **Boutons du bas de la sidebar (PC)** : restructurés en 2 lignes (profil / boutons) — ils ne
+  débordent plus des 230px.
+- **.row** passe à la ligne (flex-wrap) : plus de débordement de boutons sur écrans étroits.
+
+### ⚠️ INDEX FIRESTORE OBLIGATOIRE (cause du "failed-precondition")
+La révocation, "mes plannings partagés" et l'accès nécessitent un index collectionGroup.
+Tant qu'il n'est pas créé, ces fonctions échouent avec "failed-precondition".
