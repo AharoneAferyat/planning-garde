@@ -165,7 +165,7 @@ a{color:inherit;text-decoration:none}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 
 /* ---------- Planning grid ---------- */
-.blocks{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem}
 .month{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:1rem}
 .month-h{background:var(--ink);color:#fff;text-align:center;font-weight:700;padding:.5rem;font-size:.9rem}
 .mgrid{width:100%;border-collapse:collapse}
@@ -359,13 +359,13 @@ a{color:inherit;text-decoration:none}
 .pm{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1rem;box-shadow:var(--shadow)}
 .pm-h{background:linear-gradient(120deg,#1e3a8a,#2563eb);color:#fff;font-weight:700;padding:.55rem;text-align:center;font-size:.9rem}
 .pt{width:100%;border-collapse:collapse}
-.pt th{background:#f1f5f9;color:#64748b;font-size:.64rem;text-transform:uppercase;letter-spacing:.4px;padding:.35rem .4rem;font-weight:700;border-bottom:1px solid var(--line)}
-.pt td{padding:.26rem .45rem;font-size:.79rem;border-bottom:1px solid #eef2f7;text-align:center;height:29px}
+.pt th{background:var(--bg-2);color:var(--muted);font-size:.64rem;text-transform:uppercase;letter-spacing:.4px;padding:.35rem .4rem;font-weight:700;border-bottom:1px solid var(--line)}
+.pt td{padding:.26rem .45rem;font-size:.79rem;border-bottom:1px solid var(--line);text-align:center;height:29px}
 .pt tr:last-child td{border-bottom:none}
 .pt tr.we td{background:#fdf9f0}.pt tr.sun td{background:#fdf4f7}.pt tr.fer td{background:#eef6ff}
 .pt tr.conflit td{background:var(--red-l)}
-.pt .pdd{color:#94a3b8;font-weight:600;text-align:left;white-space:nowrap}
-.pt .pdd b{color:#334155}
+.pt .pdd{color:var(--muted);font-weight:600;text-align:left;white-space:nowrap}
+.pt .pdd b{color:var(--text)}
 .pt .pchip{display:inline-block;padding:.16rem .6rem;border-radius:7px;font-weight:700;font-size:.76rem;color:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .pt .pchip.bad{background:#fff!important;color:var(--red);border:1.5px solid var(--red)}
 .pt .prep{color:#94a3b8;font-style:italic;font-size:.71rem}
@@ -497,3 +497,10 @@ a{color:inherit;text-decoration:none}
 .note-input:hover{border-color:var(--line)}
 .note-input:focus{border-color:var(--blue);background:var(--paper)}
 .note-txt{font-size:.76rem;color:var(--muted);font-style:italic}
+
+/* ---------- Planning : couleurs de lignes adaptées au thème sombre ---------- */
+[data-theme="dark"] .pt tr.we td{background:rgba(251,191,36,.06)}
+[data-theme="dark"] .pt tr.sun td{background:rgba(244,114,182,.07)}
+[data-theme="dark"] .pt tr.fer td{background:rgba(96,165,250,.10)}
+[data-theme="dark"] .pt tr.changed td{background:rgba(234,179,8,.14)!important}
+[data-theme="dark"] .pt .pchip.bad{background:var(--paper)!important}
