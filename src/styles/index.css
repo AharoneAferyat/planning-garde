@@ -432,8 +432,8 @@ a{color:inherit;text-decoration:none}
 .notif{position:relative;display:inline-flex}
 .notif-dot{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:.58rem;font-weight:800;
   min-width:15px;height:15px;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 3px}
-.notif-panel{position:absolute;bottom:calc(100% + 8px);right:0;width:320px;max-width:calc(100vw - 32px);
-  background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);z-index:200;overflow:hidden;color:var(--text)}
+.notif-panel{position:absolute;bottom:0;left:calc(100% + 12px);width:320px;max-width:calc(100vw - 32px);
+  background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);z-index:400;overflow:hidden;color:var(--text)}
 .notif-h{display:flex;align-items:center;justify-content:space-between;padding:.7rem .9rem;border-bottom:1px solid var(--line);font-weight:700;font-size:.9rem;color:var(--text)}
 .link-btn{display:inline-flex;align-items:center;gap:.25rem;color:var(--blue-d);font-size:.76rem;font-weight:600}
 .notif-list{max-height:min(60vh,380px);overflow-y:auto}
@@ -448,7 +448,7 @@ a{color:inherit;text-decoration:none}
 .notif-x:hover{background:var(--red-l);color:var(--red)}
 /* sur mobile, le panneau s'ancre sous la barre du haut */
 @media (max-width:900px){
-  .mobile-top .notif-panel{position:fixed;top:56px;right:8px;bottom:auto}
+  .mobile-top .notif-panel{position:fixed;top:56px;right:8px;left:auto;bottom:auto;width:min(340px,calc(100vw - 16px))}
 }
 
 /* ---------- Check-rows (sélection destinataires) ---------- */
