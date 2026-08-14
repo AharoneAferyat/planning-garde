@@ -50,6 +50,13 @@ export default function Layout({ children }) {
           </NavLink>
         )}
         <div className="foot">
+          <div className="foot-actions">
+            <NotificationBell />
+            <button className="btn-icon" title={`Thème : ${label} (cliquer pour changer)`} onClick={cycle}>
+              <ThemeIcon size={17} />
+            </button>
+            <button className="btn-icon" title="Déconnexion" onClick={logout}><Power size={17} /></button>
+          </div>
           <div className="foot-profile">
             <div className="avatar">
               {user?.photo ? <img src={user.photo} alt="" /> : initials(user?.nom)}
@@ -58,13 +65,6 @@ export default function Layout({ children }) {
               <div className="n">{user?.nom}</div>
               <div className="r">{user?.email}</div>
             </div>
-          </div>
-          <div className="foot-actions">
-            <NotificationBell />
-            <button className="btn-icon" title={`Thème : ${label} (cliquer pour changer)`} onClick={cycle}>
-              <ThemeIcon size={17} />
-            </button>
-            <button className="btn-icon" title="Déconnexion" onClick={logout}><Power size={17} /></button>
           </div>
         </div>
       </aside>
